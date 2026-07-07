@@ -7,6 +7,26 @@ escape vulnerability in the KVM/x86 shadow MMU.
 
 **Applies the upstream fix without rebooting or migrating VMs.**
 
+- [Overview](#overview)
+  - [What this hotfix does](#what-this-hotfix-does)
+  - [How to verify if your kernel is vulnerable](#how-to-verify-if-your-kernel-is-vulnerable)
+- [Deployment](#deployment)
+  - [Option A: One-click hotfix](#option-a-one-click-hotfix-recommended-zero-downtime)
+  - [Option B: Manual kernel patching](#option-b-manual-kernel-patching-compile-a-new-kernel)
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+  - [Host kernel](#host-kernel)
+  - [Build host](#build-host)
+  - [Guest (attack surface)](#guest-attack-surface)
+  - [QEMU version & PoC exploitability](#qemu-version--poc-exploitability)
+- [Go Installer Reference](#go-installer-reference)
+- [Verification](#verification)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [Project Structure](#project-structure)
+- [License](#license)
+- [References](#references)
+
 ## Overview
 
 Januscape is a **use-after-free** in `kvm_mmu_get_child_sp()` that allows a
