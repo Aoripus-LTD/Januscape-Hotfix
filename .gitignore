@@ -1,0 +1,36 @@
+# Build artifacts
+*.o
+*.ko
+*.mod.c
+*.mod.o
+*.symvers
+*.order
+.*.cmd
+.tmp_versions/
+Module.symvers
+modules.order
+# Kernel module intermediate (NOT Go module files)
+*.mod
+!go.mod
+
+# Go
+installer/januscape-hotfix
+installer/vendor/
+
+# Artifacts directory
+kmod/artifacts/
+
+# Editor
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PoC exploit files (reference only, not part of hotfix)
+Januscape-main.zip
+Januscape-main/
