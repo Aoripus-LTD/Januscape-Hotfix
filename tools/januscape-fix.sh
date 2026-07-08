@@ -184,9 +184,6 @@ EOF
     fi
 
     rm -f /tmp/kernel-debuginfo-*.rpm
-            fi
-        fi
-    fi
 
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
         err "debuginfo 安装失败 — 内核 $(uname -r) 无可用调试符号包"
