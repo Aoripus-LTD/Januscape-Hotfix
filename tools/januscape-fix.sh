@@ -2,7 +2,7 @@
 # Januscape (CVE-2026-53359) — 全功能一键修复脚本
 # 自动检测环境、推荐方案、多镜像自动 fallback
 
-VERSION="v26.7.8-beta53"
+VERSION="v26.7.8-beta54"
 
 set -e
 
@@ -168,7 +168,8 @@ EOF
 
     # 方法 1: dnf debuginfo-install (标准 RHEL 系做法)
     if dnf debuginfo-install -y kernel-$(uname -r) 2>/dev/null; then
-        DEBUGINFO_OK=1
+        # dnf 返回 0 不代表装上了，要真检查文件
+        [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
     fi
 
     # 方法 2: 直接搜索 BaseOS 同目录下的 debuginfo RPM
@@ -185,7 +186,8 @@ EOF
             curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
                 "${BASE_URL}/k/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
             if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
-                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null && DEBUGINFO_OK=1
+                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null
+                [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
             fi
         fi
     fi
@@ -201,7 +203,8 @@ EOF
             curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
                 "${URL}/Packages/k/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
             if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
-                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null && DEBUGINFO_OK=1
+                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null
+                [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
                 break
             fi
         done
@@ -219,7 +222,7 @@ EOF
         rm -f /etc/yum.repos.d/el8-temp-*.repo
         return
     fi
-    ok "debuginfo 安装完成"
+        ok "debuginfo 已确认安装"
     rm -f /etc/yum.repos.d/el8-temp-*.repo
 
     if command -v kpatch &>/dev/null; then
