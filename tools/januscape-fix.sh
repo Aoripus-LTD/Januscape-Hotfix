@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta82"
+VERSION="v26.7.8-beta83"
 
 set -e
 
@@ -77,6 +77,7 @@ run_kpatch_deps(){
             local LOADED=0
             for KO_URL in \
                 "https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}" \
+                "https://ghproxy.net/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}" \
                 "https://www.aoripus.cn/dl/${KO_FILE}"; do
                 log "下载预编译补丁: ${KO_URL##*/}"
                 curl -#L --connect-timeout 10 -m 120 -o "/tmp/${KO_FILE}" "$KO_URL" 2>/dev/null
