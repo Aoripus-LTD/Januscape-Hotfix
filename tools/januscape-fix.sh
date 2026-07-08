@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta108"
+VERSION="v26.7.8-beta109"
 
 set -e
 
@@ -629,16 +629,6 @@ show_menu() {
             cat "/sys/module/${KVM_MOD}/parameters/nested"
             ;;
         4)
-            # 预检: kvm_mmu_child_role 必须存在
-            if ! grep -q 'kvm_mmu_child_role' /proc/kallsyms 2>/dev/null; then
-                err "当前内核无 kvm_mmu_child_role 符号，livepatch 不可用 (RHEL 8 4.18 常见)"
-                local KVR=$(uname -r | grep -oP '4\.18\.0-\K[0-9]+')
-                case "$KVR" in 408|496|500|553)
-                    echo "  该内核有预编译 kpatch，请使用选项 5" ;;
-                *) echo "  请使用 nested=0 或内核升级 7.1" ;;
-                esac
-                return
-            fi
             log "下载并编译 livepatch 热修复模块..."
             # 确保 kernel-devel 可用
             if [ ! -f "/lib/modules/$KERNEL/build/Makefile" ]; then
