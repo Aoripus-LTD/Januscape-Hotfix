@@ -29,13 +29,13 @@ curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/m
 
 ## 选择修复方案
 
-| 方案 | 复现度 | 操作难度 | 宿主机重启 | 虚拟机重启 | 生效时间 | 长期有效 | 影响 |
+| 方案 | 复现 | 难度 | 宿主机重启 | VM 重启 | 生效时间 | 长期有效 | 影响 |
 |------|:---:|:---:|:---:|:---:|---|---|:---:|
-| **[nested=0](docs/nested-disable.md)** | 高 | 低 | KVM重载或重启 | √ | 即时 | ✓ | 无法在 VM 内继续创建嵌套虚拟机 |
-| **[ftrace 热修复](docs/ftrace-hotfix.md)** | 低 | 高 | ✕ | ✕ | 即时 | ✓ | 对内核版本精度要求高，部分内核可能无法修补 |
-| **[kpatch (RHEL 8)](docs/kpatch-rhel8.md)** | 高 | 中 | ✕ | ✕ | 即时 | ✓ | 编译阶段可能报错，需灵活调整依赖 |
-| **[内核重编译](docs/manual-patch.md)** | 高 | 高 | √ | √ | 编译+重启 | ✓ | 一次修改永久有效，不依赖任何补丁形式 |
-| **[内核升级 7.1](docs/kernel-upgrade.md)** | 高 | 中 | √ | √ | 编译30-60分钟+重启 | ✓ | 主线上游已包含修复；魔方云需修 python 软链接 |
+| **[nested=0](docs/nested-disable.md)** | 高 | 低 | KVM 重载 | √ | 即时 | ✓ | 无法在 VM 内创建嵌套虚拟机 |
+| **[ftrace](docs/ftrace-hotfix.md)** | 低 | 高 | ✕ | ✕ | 即时 | ✓ | 对内核版本精度要求高 |
+| **[kpatch](docs/kpatch-rhel8.md)** | 高 | 中 | ✕ | ✕ | 即时 | ✓ | 编译可能报错，需灵活调整 |
+| **[重编译](docs/manual-patch.md)** | 高 | 高 | √ | √ | 编译+重启 | ✓ | 一次永久有效，不依赖补丁 |
+| **[升级 7.1](docs/kernel-upgrade.md)** | 高 | 中 | √ | √ | 30分钟+重启 | ✓ | 主线上游已含；魔方云修软链接 |
 
 ## 快速检测
 

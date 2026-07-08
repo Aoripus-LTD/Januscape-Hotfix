@@ -31,13 +31,13 @@ Multi-mirror auto-fallback — no manual switching needed.
 
 ## Choose your fix
 
-| Method | Reliability | Difficulty | Host Reboot | VM Reboot | Effective | Permanent | Side Effect |
+| Method | Repr. | Diff. | Host Reboot | VM Reboot | Effective | Permanent | Side Effect |
 |--------|:---:|:---:|:---:|:---:|---|---|:---:|
-| **[nested=0](docs/nested-disable.md)** | High | Low | KVM reload or reboot | ✓ | Instant | ✓ | No nested VM creation inside guests |
-| **[ftrace hotfix](docs/ftrace-hotfix.md)** | Low | High | ✕ | ✕ | Instant | ✓ | Requires precise kernel version match |
-| **[kpatch (RHEL 8)](docs/kpatch-rhel8.md)** | High | Medium | ✕ | ✕ | Instant | ✓ | Build may need dependency adjustments |
-| **[kernel rebuild](docs/manual-patch.md)** | High | High | ✓ | ✓ | Build + reboot | ✓ | Permanent, no runtime dependencies |
-| **[kernel upgrade 7.1](docs/kernel-upgrade.md)** | High | Medium | ✓ | ✓ | Build 30-60min + reboot | ✓ | Upstream fix included; Mofang Cloud needs python symlink fix |
+| **[nested=0](docs/nested-disable.md)** | High | Low | KVM reload | ✓ | Instant | ✓ | No nested VM creation |
+| **[ftrace](docs/ftrace-hotfix.md)** | Low | High | ✕ | ✕ | Instant | ✓ | Requires exact kernel match |
+| **[kpatch](docs/kpatch-rhel8.md)** | High | Med | ✕ | ✕ | Instant | ✓ | Build may need adjustments |
+| **[rebuild](docs/manual-patch.md)** | High | High | ✓ | ✓ | Build+reboot | ✓ | Permanent, no runtime deps |
+| **[upgrade 7.1](docs/kernel-upgrade.md)** | High | Med | ✓ | ✓ | Build+reboot | ✓ | Upstream fix included |
 
 ## Quick check
 
