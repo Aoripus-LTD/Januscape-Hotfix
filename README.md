@@ -29,22 +29,16 @@ curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/m
 
 ## 选择修复方案
 
-| 方案 | 复现 | 难度 | 宿主机重启 | VM 重启 | 生效时间 | 长期有效 | 影响 |
-|------|:---:|:---:|:---:|:---:|---|---|:---:|
-| **[nested=0](docs/nested-disable.md)** | 高 | 低 | KVM 重载 | √ | 即时 | ✓ | 无法在 VM 内创建嵌套虚拟机 |
-| **[ftrace](docs/ftrace-hotfix.md)** | 低 | 高 | ✕ | ✕ | 即时 | ✓ | 对内核版本精度要求高 |
-| **[kpatch](docs/kpatch-rhel8.md)** | 高 | 中 | ✕ | ✕ | 即时 | ✓ | 编译可能报错，需灵活调整 |
-| **[重编译](docs/manual-patch.md)** | 高 | 高 | √ | √ | 编译+重启 | ✓ | 一次永久有效，不依赖补丁 |
-| **[升级 7.1](docs/kernel-upgrade.md)** | 高 | 中 | √ | √ | 30分钟+重启 | ✓ | 主线上游已含；魔方云修软链接 |
+| 方案 | 推荐度 | 成功率 | 难度 | 宿主机重启 | VM 重启 | 生效时间 | 长期有效 | 影响 |
+|------|:---:|:---:|:---:|:---:|:---:|---|---|:---:|
+| **[livepatch](docs/livepatch-hotfix.md)** | ⭐⭐⭐⭐⭐ | 8/10 | 高 | ✕ | ✕ | 即时 | ✓ | 同时修复 DoS + UAF 逃逸链；需内核 ≥ 4.12 + CONFIG_LIVEPATCH=y |
+| **[kpatch](docs/kpatch-rhel8.md)** | ⭐⭐⭐⭐ | 6/10 | 中 | ✕ | ✕ | 即时 | ✓ | 仅支持 RHEL 8 已验证子版本 |
+| **[nested=0](docs/nested-disable.md)** | ⭐⭐⭐ | 10/10 | 低 | KVM 重载 | √ | VM/KVM 重启后 | ✓ | 无法在 VM 内创建嵌套虚拟机 |
+| **[内核升级 7.1](docs/kernel-upgrade.md)** | ⭐⭐⭐ | 9/10 | 中 | √ | √ | 30-60分钟+重启 | ✓ | 主线上游已含；魔方云需修软链接 |
+| **[内核重编译](docs/manual-patch.md)** | ⭐⭐ | 9/10 | 高 | √ | √ | 编译+重启 | ✓ | 一次修改永久有效，不依赖补丁 |
 
-> **kpatch 仅支持已验证的内核子版本: 4.18.0-408, 496, 500, 553 (el8)**
+> kpatch 仅支持已验证的内核子版本: 4.18.0-408, 496, 500, 553 (el8)。脚本会在编译前检查，不匹配时提示替代方案。
 > 脚本会在编译前检查内核版本，不匹配时提示替代方案。
-
-- [nested=0](docs/nested-disable.md)
-- [ftrace](docs/ftrace-hotfix.md)
-- [kpatch](docs/kpatch-rhel8.md)
-- [重编译](docs/manual-patch.md)
-- [升级 7.1](docs/kernel-upgrade.md)
 
 ## 快速检测
 
@@ -70,17 +64,17 @@ bash tools/januscape-check.sh
 
 QEMU 6.x 会部分屏蔽 PoC 的可利用性（L1 VM 先崩溃、宿主机未 panic），但
 逃逸信号**已到达 L0 KVM**。
-[实测证据](docs/ftrace-hotfix.md#qemu-版本与-poc-的可利用性)。
+[实测证据](docs/livepatch-hotfix.md#qemu-版本与-poc-的可利用性)。
 QEMU 不是安全边界——无论 QEMU 什么版本都应修补 KVM。
 
 ## 项目结构
 
 ```
-├── kmod/                 # 内核模块（ftrace hook）
+├── kmod/                 # 内核模块（livepatch API）
 ├── installer/            # Go 部署工具
 ├── docs/                 # 详细方案文档
 │   ├── nested-disable.md
-│   ├── ftrace-hotfix.md
+│   ├── livepatch-hotfix.md
 │   ├── kpatch-rhel8.md
 │   ├── kernel-upgrade.md
 │   └── manual-patch.md
