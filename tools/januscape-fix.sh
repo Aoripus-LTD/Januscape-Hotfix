@@ -2,7 +2,7 @@
 # Januscape (CVE-2026-53359) — 全功能一键修复脚本
 # 自动检测环境、推荐方案、多镜像自动 fallback
 
-VERSION="v26.7.8-beta51"
+VERSION="v26.7.8-beta53"
 
 set -e
 
@@ -101,17 +101,24 @@ EOF
                 [ -f "/lib/modules/$(uname -r)/build/Makefile" ] && break
             done
 
-            # 当前小版本没有 → 降级搜索更老小版本的 vault
-            if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ] && [ -n "$VLT_BASE" ]; then
-                local MINOR="${VER##*.}"
-                while [ "$MINOR" -gt 0 ]; do
-                    MINOR=$((MINOR - 1))
-                    local OLD_BASE="${VLT_BASE%/*.*}/${MAJOR}.${MINOR}"
-                    warn "降级搜索: ${OLD_BASE}..."
+            # 如果本发行版找不到，尝试所有已知 RHEL 8 系源
+            if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
+                warn "本发行版仓库无此内核，尝试 Rocky / Alma vault..."
+                local ALL_VAULTS=(
+                    "https://dl.rockylinux.org/pub/rocky/8.10"
+                    "https://dl.rockylinux.org/vault/rocky/8.9"
+                    "https://dl.rockylinux.org/vault/rocky/8.8"
+                    "https://dl.rockylinux.org/vault/rocky/8.7"
+                    "https://dl.rockylinux.org/vault/rocky/8.6"
+                    "https://repo.almalinux.org/almalinux/8.10"
+                    "https://repo.almalinux.org/vault/8.9"
+                    "https://repo.almalinux.org/vault/8.8"
+                )
+                for VAULT in "${ALL_VAULTS[@]}"; do
                     cat > /etc/yum.repos.d/el8-temp.repo << EOF
 [el8-temp-baseos]
-name=EL8 Vault ${MAJOR}.${MINOR} BaseOS
-baseurl=${OLD_BASE}/BaseOS/x86_64/os/
+name=EL8 External Vault BaseOS
+baseurl=${VAULT}/BaseOS/x86_64/os/
 enabled=1
 gpgcheck=0
 skip_if_unavailable=1
