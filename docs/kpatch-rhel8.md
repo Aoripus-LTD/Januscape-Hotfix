@@ -1,5 +1,8 @@
 # kpatch 热修复 — RHEL 8.x / CentOS 8 / Rocky 8 / Alma 8 / 魔方云（内核 4.18）
 
+> **⚠️ 仅支持已验证的内核子版本: 4.18.0-408, 496, 500, 553 (el8)**
+> 脚本会在编译前执行 `uname -r` 检查，不匹配时提示替代方案。
+
 这些系统的 4.18 内核将 shadow page 分配函数命名为 `kvm_mmu_get_page`（6 参数），
 而我们的 ftrace 模块替换目标是 `kvm_mmu_get_child_sp`（5 参数），
 ABI 不兼容，ftrace 方案无法工作。

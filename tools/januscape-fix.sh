@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta79"
+VERSION="v26.7.8-beta80"
 
 set -e
 
@@ -63,6 +63,31 @@ run_audit()      { try_fetch tools/januscape-check.sh   | bash; }
 run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
 run_kpatch_deps(){
     log "kpatch 编译环境准备"
+
+    # 前置: 内核版本预检
+    local KVER=$(uname -r | sed 's/\.el8.*//; s/.*-//')
+    case "$KVER" in
+        408|496|500|553)
+            ok "内核 ${KVER} 在 kpatch 支持范围内" ;;
+        552)
+            err "内核 552 代码结构不兼容 — kpatch 无法编译"
+            echo "  552 的 paging_tmpl.h 已重构，patch 上下文不匹配"
+            echo ""
+            echo "  替代方案:"
+            echo "    1. nested=0 关闭嵌套虚拟化 (无需编译)"
+            echo "    2. 内核升级 7.1  (源码编译，自带补丁)"
+            return ;;
+        *)
+            warn "内核 ${KVER} 未经测试 — 可能不兼容"
+            warn "已验证子版本: 408, 496, 500, 553"
+            local ans0
+            if [ -t 0 ]; then
+                read -p "  是否继续? [y/N] " ans0
+            else
+                read -p "  是否继续? [y/N] " ans0 </dev/tty
+            fi
+            [ "$ans0" != "y" ] && [ "$ans0" != "Y" ] && return ;;
+    esac
 
     # 前置检查: kernel-devel — 没有就尝试安装
     if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
