@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta87"
+VERSION="v26.7.8-beta90"
 
 set -e
 
@@ -479,7 +479,7 @@ detect_env() {
     if grep -q 'kvm_mmu_get_page' /proc/kallsyms 2>/dev/null && \
        ! grep -q 'kvm_mmu_get_child_sp' /proc/kallsyms 2>/dev/null; then
         IS_RHEL8=1
-        warn "  内核类型: RHEL 8.x 4.18 分支 (ftrace 热修复不可用)"
+        warn "  内核类型: RHEL 8.x 4.18 分支 (livepatch 热修复不可用)"
     else
         IS_RHEL8=0
     fi
@@ -567,7 +567,7 @@ show_menu() {
     echo ""
     echo -e "  ${BOLD}操作${NC}"
     echo "  1) 集群审计                2) 崩溃日志取证"
-    echo "  3) nested=0 一键关闭      4) ftrace 编译加载"
+    echo "  3) nested=0 一键关闭      4) livepatch 编译加载"
     if [ "$IS_RHEL8" -eq 1 ]; then
         echo "  5) kpatch 环境准备         6) 内核升级 7.1 指南"
         echo "  7) 查看完整文档"
@@ -619,7 +619,7 @@ show_menu() {
             cat "/sys/module/${KVM_MOD}/parameters/nested"
             ;;
         4)
-            log "下载并编译 ftrace 热修复模块..."
+            log "下载并编译 livepatch 热修复模块..."
             TMPD=$(mktemp -d)
             try_fetch kmod/hotfix.c      > "$TMPD/hotfix.c"
             try_fetch kmod/offsets_db.h   > "$TMPD/offsets_db.h"
@@ -683,7 +683,7 @@ show_docs() {
     echo ""
     echo "  各方案明细:"
     echo "  - nested=0:     docs/nested-disable.md"
-    echo "  - ftrace 热修复: docs/ftrace-hotfix.md"
+    echo "  - livepatch 热修复: docs/livepatch-hotfix.md"
     echo "  - kpatch:       docs/kpatch-rhel8.md"
     echo "  - 内核重编译:   docs/manual-patch.md"
     echo "  - 内核升级 7.1: docs/kernel-upgrade.md"

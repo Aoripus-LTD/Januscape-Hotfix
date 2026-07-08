@@ -31,13 +31,13 @@ Multi-mirror auto-fallback — no manual switching needed.
 
 ## Choose your fix
 
-| Method | Repr. | Diff. | Host Reboot | VM Reboot | Effective | Permanent | Side Effect |
-|--------|:---:|:---:|:---:|:---:|---|---|:---:|
-| **[nested=0](docs/nested-disable.md)** | High | Low | KVM reload | ✓ | Instant | ✓ | No nested VM creation |
-| **[ftrace](docs/ftrace-hotfix.md)** | Low | High | ✕ | ✕ | Instant | ✓ | Requires exact kernel match |
-| **[kpatch](docs/kpatch-rhel8.md)** | High | Med | ✕ | ✕ | Instant | ✓ | Build may need adjustments |
-| **[rebuild](docs/manual-patch.md)** | High | High | ✓ | ✓ | Build+reboot | ✓ | Permanent, no runtime deps |
-| **[upgrade 7.1](docs/kernel-upgrade.md)** | High | Med | ✓ | ✓ | Build+reboot | ✓ | Upstream fix included |
+| Method | Rating | Success | Difficulty | Host Reboot | VM Reboot | Effective | Permanent | Side Effect |
+|--------|:---:|:---:|:---:|:---:|:---:|---|---|:---:|
+| **[livepatch](docs/livepatch-hotfix.md)** | ⭐⭐⭐⭐⭐ | 8/10 | High | ✕ | ✕ | Instant | ✓ | Fixes both DoS + UAF escape; needs kernel ≥ 4.12 + CONFIG_LIVEPATCH=y |
+| **[kpatch](docs/kpatch-rhel8.md)** | ⭐⭐⭐⭐ | 6/10 | Medium | ✕ | ✕ | Instant | ✓ | RHEL 8 tested sub-versions only |
+| **[nested=0](docs/nested-disable.md)** | ⭐⭐⭐ | 10/10 | Low | KVM reload | ✓ | After VM/KVM restart | ✓ | No nested VM creation |
+| **[kernel upgrade 7.1](docs/kernel-upgrade.md)** | ⭐⭐⭐ | 9/10 | Medium | ✓ | ✓ | Build + reboot | ✓ | Upstream fix included |
+| **[kernel rebuild](docs/manual-patch.md)** | ⭐⭐ | 9/10 | High | ✓ | ✓ | Build + reboot | ✓ | Permanent, no runtime deps |
 
 ## Quick check
 
@@ -63,17 +63,17 @@ bash tools/januscape-check.sh
 
 QEMU 6.x partially masks PoC exploitability (VM crashes before host panic),
 but the escape signal **reaches L0 KVM**.
-[Evidence](docs/ftrace-hotfix.md#qemu-version--poc-exploitability).
+[Evidence](docs/livepatch-hotfix.md#qemu-version--poc-exploitability).
 QEMU is not a security boundary — patch KVM regardless.
 
 ## Project Structure
 
 ```
-├── kmod/                 # Kernel module (ftrace hook)
+├── kmod/                 # Kernel module (livepatch API)
 ├── installer/            # Go deployment tool
 ├── docs/                 # Detailed method docs
 │   ├── nested-disable.md
-│   ├── ftrace-hotfix.md
+│   ├── livepatch-hotfix.md
 │   ├── kpatch-rhel8.md
 │   ├── kernel-upgrade.md
 │   └── manual-patch.md
