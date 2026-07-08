@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta64"
+VERSION="v26.7.8-beta67"
 
 set -e
 
@@ -262,6 +262,15 @@ EOF
         curl -sL --connect-timeout 5 -m 30 -o "$PATCHDIR/fix.patch" "$PATCH_URL" 2>/dev/null
         if [ -f "$PATCHDIR/fix.patch" ] && grep -q 'kvm_mmu_page' "$PATCHDIR/fix.patch" 2>/dev/null; then
             cd "$PATCHDIR"
+            # 配 CentOS Source 仓库 (kpatch-build 需要 src.rpm)
+            cat > /etc/yum.repos.d/centos-source.repo << 'EOF'
+[centos-source]
+name=CentOS 8 Stream Source (Rocky Vault)
+baseurl=https://dl.rockylinux.org/vault/centos/8-stream/BaseOS/Source/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF
             log "开始 kpatch-build (预计 10-20 分钟)..."
             kpatch-build --skip-compiler-check fix.patch 2>&1 | tail -10
             if ls kpatch-*.ko 2>/dev/null; then
@@ -452,14 +461,15 @@ show_menu() {
     echo "  1) 集群审计                2) 崩溃日志取证"
     echo "  3) nested=0 一键关闭      4) ftrace 编译加载"
     if [ "$IS_RHEL8" -eq 1 ]; then
-        echo "  5) kpatch 环境准备 (依赖检查 & 安装)  6) 查看完整文档"
+        echo "  5) kpatch 环境准备         6) 内核升级 7.1 指南"
+        echo "  7) 查看完整文档"
+        CHOICE_MAX=7
     else
-        echo "  5) 查看完整文档"
+        echo "  5) 内核升级 7.1 指南       6) 查看完整文档"
+        CHOICE_MAX=6
     fi
     echo "  0) 退出"
     echo ""
-    CHOICE_MAX=6
-    [ "$IS_RHEL8" -eq 0 ] && CHOICE_MAX=5
     if [ -t 0 ]; then
         read -p "  请选择 [0-${CHOICE_MAX}]: " CHOICE
     else
@@ -519,10 +529,17 @@ show_menu() {
             if [ "$IS_RHEL8" -eq 1 ]; then
                 run_kpatch_deps
             else
+                show_upgrade
+            fi
+            ;;
+        6)
+            if [ "$IS_RHEL8" -eq 1 ]; then
+                show_upgrade
+            else
                 show_docs
             fi
             ;;
-        6) show_docs ;;
+        7) show_docs ;;
         0) exit 0 ;;
         *) warn "无效选择" ;;
     esac
@@ -535,6 +552,22 @@ show_menu() {
         read -p "  按 Enter 返回主菜单 (输入 0 退出)..." PAUSE </dev/tty
     fi
     [ "$PAUSE" = "0" ] && exit 0
+}
+
+show_upgrade() {
+    echo ""
+    echo "  内核升级 7.1 指南: docs/kernel-upgrade.md"
+    echo "  快速步骤:"
+    echo ""
+    echo "  wget https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.3.tar.xz"
+    echo "  tar xf linux-7.1.3.tar.xz && cd linux-7.1.3"
+    echo "  zcat /proc/config.gz > .config || cp /boot/config-\$(uname -r) .config"
+    echo "  scripts/config --disable MODULE_SIG --disable MODULE_SIG_FORCE"
+    echo "  make olddefconfig"
+    echo "  make -j\$(nproc) && make modules_install && make install"
+    echo "  grubby --set-default /boot/vmlinuz-7.1.3 && reboot"
+    echo ""
+    echo "  完整步骤 & 常见错误: docs/kernel-upgrade.md"
 }
 
 show_docs() {

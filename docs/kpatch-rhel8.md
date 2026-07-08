@@ -100,6 +100,37 @@ if (is_shadow_present_pte(*it.sptep)) {
 效果与上游 `81ccda30b4e8` 相同——阻止了 direct split page 被错误地
 当作 indirect shadow page 复用。
 
+## 已知问题
+
+### CentOS 8 Source 仓库已停服
+
+`kpatch-build` 需要下载内核源码 RPM（`kernel-*.src.rpm`），但 CentOS 8
+已 EOL，`vault.centos.org` 的 Source 仓库已下线。
+
+错误信息：
+```
+Errors during downloading metadata for repository 'baseos-source':
+  Status code: 404 for https://vault.centos.org/centos-vault/8-stream/BaseOS/Source/repodata/repomd.xml
+```
+
+此问题无法通过配置其他 BaseOS/Debuginfo 镜像解决——Source 仓库独立于
+二进制包仓库，且 CentOS 官方未保留。
+
+**解决方案**：Rocky Linux 的 vault 保留了完整的 CentOS 8 Source 镜像：
+
+```bash
+cat > /etc/yum.repos.d/centos-source.repo << 'EOF'
+[centos-source]
+name=CentOS 8 Stream Source (Rocky Vault)
+baseurl=https://dl.rockylinux.org/vault/centos/8-stream/BaseOS/Source/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF
+```
+
+配置完成后重新执行 `kpatch-build`。
+
 ## 致谢
 
 `FNAME(fetch)` 调用点校验的思路来自社区安全研究者**极点**对 Januscape
