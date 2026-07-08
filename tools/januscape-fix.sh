@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta114"
+VERSION="v26.7.8-beta115"
 
 set -e
 
@@ -80,10 +80,22 @@ run_kpatch_deps(){
 
             # 尝试直接下载预编译 .ko (GitHub → 自建 CDN fallback)
             local LOADED=0
-            for KO_URL in \
-                "https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}" \
-                "https://ghproxy.net/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}" \
-                "https://www.aoripus.cn/dl/${KO_FILE}"; do
+            # CN 用户优先走国内 CDN
+            local COUNTRY=$(curl -s --connect-timeout 3 -m 5 ipinfo.io 2>/dev/null | grep -oP '"country"\s*:\s*"\K[^"]+')
+            if [ "$COUNTRY" = "CN" ]; then
+                KO_URLS=(
+                    "https://www.aoripus.cn/dl/${KO_FILE}"
+                    "https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}"
+                    "https://ghproxy.net/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}"
+                )
+            else
+                KO_URLS=(
+                    "https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}"
+                    "https://ghproxy.net/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}"
+                    "https://www.aoripus.cn/dl/${KO_FILE}"
+                )
+            fi
+            for KO_URL in "${KO_URLS[@]}"; do
                 log "下载预编译补丁: ${KO_URL##*/}"
                 curl -#L --connect-timeout 10 -m 120 -o "/tmp/${KO_FILE}" "$KO_URL" || true
                 if [ -s "/tmp/${KO_FILE}" ]; then
