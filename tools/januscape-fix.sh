@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta103"
+VERSION="v26.7.8-beta104"
 
 set -e
 
@@ -48,10 +48,10 @@ try_fetch() {
     tmp=$(mktemp)
     url="${GITHUB_BASE}/${path}"
     # 直连
-    curl -#L --connect-timeout 10 -m 60 -o "$tmp" "$url" && [ -s "$tmp" ] && { cat "$tmp"; rm -f "$tmp"; return 0; }
+    curl -#fL --connect-timeout 30 -m 120 -o "$tmp" "$url" && [ -s "$tmp" ] && { cat "$tmp"; rm -f "$tmp"; return 0; }
     # fallback 镜像
     for url in "${MIRRORS[@]}"; do
-        curl -#L --connect-timeout 10 -m 60 -o "$tmp" "${url}/${path}" && [ -s "$tmp" ] && {
+        curl -#fL --connect-timeout 30 -m 120 -o "$tmp" "${url}/${path}" && [ -s "$tmp" ] && {
             log "镜像: ${url%%/https*}" ; cat "$tmp"; rm -f "$tmp"; return 0; }
     done
     err "下载失败: $path"
