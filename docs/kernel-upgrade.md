@@ -45,6 +45,10 @@ zcat /proc/config.gz > .config 2>/dev/null || \
 # 合并新版本新增选项（全部默认）
 make olddefconfig
 
+# 关闭模块签名 (发行版内核配置默认开启但无有效 key，会导致 modules_install 失败)
+scripts/config --disable MODULE_SIG --disable MODULE_SIG_FORCE
+make olddefconfig
+
 # 确认 KVM 相关选项
 grep -E 'CONFIG_KVM=|CONFIG_KVM_INTEL|CONFIG_KVM_AMD|CONFIG_KALLSYMS_ALL' .config
 ```
@@ -90,6 +94,28 @@ ln -s /usr/bin/python3 /usr/bin/python
 
 部分魔方云面板组件依赖 `/usr/bin/python` 路径，7.1 主线移除了 Python 2，
 只保留 `python3`，需手动创建软链接。
+
+## 常见错误
+
+### `sign-file: error: no start line` — 模块签名失败
+
+编译到 `make modules_install` 阶段报错：
+
+```
+SSL error:0909006c:PEM routines:get_name:no start line
+sign-file:./
+make[2]: *** [scripts/Makefile.modinst:125] Error
+```
+
+原因：发行版内核的 `.config` 默认开启了 `CONFIG_MODULE_SIG`，但没有
+有效的模块签名密钥。执行 `make olddefconfig` 之前需关闭：
+
+```bash
+scripts/config --disable MODULE_SIG --disable MODULE_SIG_FORCE
+make olddefconfig
+```
+
+然后重新 `make -j$(nproc)` 和 `make modules_install`。
 
 ## 脚本化（批量部署）
 

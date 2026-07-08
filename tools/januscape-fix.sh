@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta60"
+VERSION="v26.7.8-beta62"
 
 set -e
 
@@ -188,7 +188,7 @@ EOF
             curl -#L --connect-timeout 10 -m 600 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
                 "${URL}/Packages/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm"
             if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
-                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null
+                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>&1 | tail -5 || true
                 [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1 && break
             fi
         done
