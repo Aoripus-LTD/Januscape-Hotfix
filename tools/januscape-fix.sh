@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta81"
+VERSION="v26.7.8-beta82"
 
 set -e
 
@@ -73,31 +73,33 @@ run_kpatch_deps(){
         408|496|500|553)
             ok "内核 ${KVER} 匹配预编译补丁"
 
-            # 尝试直接下载预编译 .ko
-            log "下载预编译补丁 ${KO_FILE}..."
-            curl -#L --connect-timeout 10 -m 120 -o "/tmp/${KO_FILE}" "$KO_URL" 2>&1 || true
-
-            if [ -s "/tmp/${KO_FILE}" ] && file "/tmp/${KO_FILE}" | grep -q 'ELF'; then
-                log "加载预编译补丁..."
-                kpatch load "/tmp/${KO_FILE}" 2>&1 || true
-                if kpatch list 2>/dev/null | grep -q 'enabled'; then
-                    ok "预编译补丁已加载"
+            # 尝试直接下载预编译 .ko (GitHub → 自建 CDN fallback)
+            local LOADED=0
+            for KO_URL in \
+                "https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}" \
+                "https://www.aoripus.cn/dl/${KO_FILE}"; do
+                log "下载预编译补丁: ${KO_URL##*/}"
+                curl -#L --connect-timeout 10 -m 120 -o "/tmp/${KO_FILE}" "$KO_URL" 2>/dev/null
+                if [ -s "/tmp/${KO_FILE}" ]; then
+                    kpatch load "/tmp/${KO_FILE}" 2>/dev/null && LOADED=1 && break
                     rm -f "/tmp/${KO_FILE}"
-                    # 验证
-                    echo ""
-                    local ans
-                    if [ -t 0 ]; then
-                        read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans
-                    else
-                        read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans </dev/tty
-                    fi
-                    [ "$ans" != "n" ] && [ "$ans" != "N" ] && detect_env
-                    return
                 fi
-                warn "kpatch load 失败，切换在线编译模式..."
-            else
-                warn "预编译包下载失败，切换在线编译模式..."
+            done
+
+            if [ "$LOADED" -eq 1 ]; then
+                ok "预编译补丁已加载"
+                rm -f "/tmp/${KO_FILE}"
+                echo ""
+                local ans
+                if [ -t 0 ]; then
+                    read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans
+                else
+                    read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans </dev/tty
+                fi
+                [ "$ans" != "n" ] && [ "$ans" != "N" ] && detect_env
+                return
             fi
+            warn "预编译包下载失败，切换在线编译模式..."
             rm -f "/tmp/${KO_FILE}"
             ;;
         552)
