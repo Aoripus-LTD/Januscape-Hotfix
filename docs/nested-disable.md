@@ -62,3 +62,17 @@ grep -r nested /sys/module/kvm_amd/parameters/
 | VM 里跑 WSL2 / Hyper-V | LXC / LXD |
 | VM 里跑 Android Emulator | 常规 Web/DB/App 工作负载 |
 | KubeVirt / Kata Containers | 普通 Kubernetes 容器运行时 |
+
+## 永久生效
+
+写入 modprobe.d 配置确保重启后不丢失：
+
+```bash
+# Intel
+echo "options kvm_intel nested=0" > /etc/modprobe.d/disable-nested.conf
+
+# AMD
+echo "options kvm_amd nested=0" > /etc/modprobe.d/disable-nested.conf
+```
+
+此文件在每次内核加载 `kvm_intel`/`kvm_amd` 时自动读取，无需额外配置。

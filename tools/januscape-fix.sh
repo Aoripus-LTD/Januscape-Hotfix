@@ -140,21 +140,26 @@ recommend() {
     echo ""
 
     if [ "$IS_RHEL8" -eq 1 ]; then
-        echo -e "  ${BOLD}推荐方案:${NC}"
-        echo "    1. nested=0          — 最简 (如可接受关闭嵌套)"
-        echo "    2. kpatch            — 在线修复 (RHEL 8.x 专用)"
-        echo "    3. 内核升级 7.1       — 永久修复"
+        echo "  ┌──────────┬────┬────┬──────┬──────┬──────┬──────┬──────────────────────────┐"
+        echo "  │ nested=0 │ 高 │ 低 │  KVM  │  √   │ 即时 │  ✓   │ 无法在 VM 内创建嵌套虚拟机   │"
+        echo "  │ kpatch   │ 高 │ 中 │  ✕   │  ✕   │ 即时 │  ✓   │ 编译可能报错需调整依赖       │"
+        echo "  │ 升级 7.1 │ 高 │ 中 │  √   │  √   │ 30分钟+重启 │ ✓ │ 主线上游已含，魔方云修软链接│"
+        echo "  └──────────┴────┴────┴──────┴──────┴──────┴──────┴──────────────────────────┘"
     elif [ "$VMS" -eq 0 ]; then
-        echo -e "  ${BOLD}推荐方案:${NC}"
-        echo "    1. nested=0          — 最简 (无 VM, 直接关嵌套)"
-        echo "    2. ftrace 热修复     — 在线修复"
-        echo "    3. 内核升级 7.1       — 永久修复"
+        echo "  ┌──────────┬────┬────┬──────┬──────┬──────┬──────┬──────────────────────────┐"
+        echo "  │ nested=0 │ 高 │ 低 │  KVM  │  √   │ 即时 │  ✓   │ 无法在 VM 内创建嵌套虚拟机   │"
+        echo "  │ ftrace   │ 低 │ 高 │  ✕   │  ✕   │ 即时 │  ✓   │ 对内核版本精度要求高         │"
+        echo "  │ 升级 7.1 │ 高 │ 中 │  √   │  √   │ 30分钟+重启 │ ✓ │ 主线上游已含，魔方云修软链接│"
+        echo "  └──────────┴────┴────┴──────┴──────┴──────┴──────┴──────────────────────────┘"
     else
-        echo -e "  ${BOLD}推荐方案:${NC}"
-        echo "    1. ftrace 热修复     — ${VMS}台 VM 在线修复, 不停机"
-        echo "    2. nested=0          — 需停 VM 重载 KVM"
-        echo "    3. 内核升级 7.1       — 需全部停机重启"
+        echo "  ┌──────────┬────┬────┬──────┬──────┬──────┬──────┬──────────────────────────┐"
+        echo "  │ ftrace   │ 低 │ 高 │  ✕   │  ✕   │ 即时 │  ✓   │ 对内核版本精度要求高         │"
+        echo "  │ nested=0 │ 高 │ 低 │  KVM  │  √   │ 即时 │  ✓   │ 无法在 VM 内创建嵌套虚拟机   │"
+        echo "  │ 升级 7.1 │ 高 │ 中 │  √   │  √   │ 30分钟+重启 │ ✓ │ 主线上游已含，魔方云修软链接│"
+        echo "  └──────────┴────┴────┴──────┴──────┴──────┴──────┴──────────────────────────┘"
     fi
+    echo ""
+    echo "  列: 方案 | 复现度 | 难度 | 宿主机重启 | VM重启 | 生效时间 | 永久有效 | 影响"
 
     echo ""
     echo "  完整对比: https://github.com/Aoripus-LTD/Januscape-Hotfix"
@@ -163,27 +168,40 @@ recommend() {
 # ── 菜单 ─────────────────────────────────────────────────────────────
 show_menu() {
     echo ""
-    echo "═══════════════════════════════════════════"
+    echo "═════════════════════════════════════════════════════"
     echo "  Januscape (CVE-2026-53359) 修复工具箱"
-    echo "  内核: $KERNEL | 虚拟化: $VIRT_TYPE"
-    echo "═══════════════════════════════════════════"
+    echo "  内核: $KERNEL | 虚拟化: $VIRT_TYPE | VM: ${VMS}台"
+    echo "═════════════════════════════════════════════════════"
     echo ""
-    echo -e "  ${BOLD}排查${NC}"
-    echo "  1) 集群审计            (januscape-check.sh)"
-    echo "  2) 崩溃日志取证        (januscape-logcheck.sh)"
+    echo "  方案对比:"
+    echo "  ┌──────────┬────┬────┬──────┬──────┬──────────┬──────┐"
+    echo "  │ 方案     │ 复现 │难度│ 宿主机│ VM   │ 生效     │ 永久 │"
+    echo "  ├──────────┼────┼────┼──────┼──────┼──────────┼──────┤"
+    echo "  │ nested=0 │ 高 │ 低 │ KVM  │  √   │ 即时     │  ✓   │"
+    echo "  │ ftrace   │ 低 │ 高 │  ✕   │  ✕   │ 即时     │  ✓   │"
+    if [ "$IS_RHEL8" -eq 1 ]; then
+        echo "  │ kpatch   │ 高 │ 中 │  ✕   │  ✕   │ 即时     │  ✓   │"
+    fi
+    echo "  │ 重编译   │ 高 │ 高 │  √   │  √   │ 编译+重启│  ✓   │"
+    echo "  │ 升级7.1  │ 高 │ 中 │  √   │  √   │ 编译+重启│  ✓   │"
+    echo "  └──────────┴────┴────┴──────┴──────┴──────────┴──────┘"
     echo ""
-    echo -e "  ${BOLD}修复${NC}"
-    echo "  3) nested=0 一键关闭嵌套"
-    echo "  4) ftrace 热修复        (编译 & 加载)"
-    echo "  5) kpatch 依赖检查      (RHEL 8.x 专用)"
-    echo "  6) 查看完整文档"
-    echo ""
+    echo "  ${BOLD}操作${NC}"
+    echo "  1) 集群审计                2) 崩溃日志取证"
+    echo "  3) nested=0 一键关闭      4) ftrace 编译加载"
+    if [ "$IS_RHEL8" -eq 1 ]; then
+        echo "  5) kpatch 依赖检查 (RHEL8) 6) 查看完整文档"
+    else
+        echo "  5) 查看完整文档"
+    fi
     echo "  0) 退出"
     echo ""
+    CHOICE_MAX=6
+    [ "$IS_RHEL8" -eq 0 ] && CHOICE_MAX=5
     if [ -t 0 ]; then
-        read -p "  请选择 [0-6]: " CHOICE
+        read -p "  请选择 [0-${CHOICE_MAX}]: " CHOICE
     else
-        read -p "  请选择 [0-6]: " CHOICE </dev/tty
+        read -p "  请选择 [0-${CHOICE_MAX}]: " CHOICE </dev/tty
     fi
 
     case $CHOICE in
@@ -191,7 +209,7 @@ show_menu() {
         2) run_logcheck ;;
         3)
             echo "options $KVM_MOD nested=0" > /etc/modprobe.d/disable-nested.conf
-            ok "已写入 /etc/modprobe.d/disable-nested.conf"
+            ok "已写入 /etc/modprobe.d/disable-nested.conf (重启后永久生效)"
             if [ "$VMS" -eq 0 ]; then
                 log "无 VM 运行，立即重载 KVM..."
                 rmmod $KVM_MOD 2>/dev/null && modprobe $KVM_MOD nested=0
@@ -206,7 +224,6 @@ show_menu() {
             try_fetch kmod/hotfix.c      > "$TMPD/hotfix.c"
             try_fetch kmod/offsets_db.h   > "$TMPD/offsets_db.h"
             try_fetch kmod/Makefile       > "$TMPD/Makefile"
-
             cd "$TMPD"
             if make KDIR="/lib/modules/$KERNEL/build" 2>&1 | tail -5; then
                 insmod hotfix.ko
@@ -214,23 +231,30 @@ show_menu() {
             else
                 err "编译失败，请检查 kernel-devel 是否安装"
             fi
-            cd - >/dev/null
-            rm -rf "$TMPD"
+            cd - >/dev/null; rm -rf "$TMPD"
             ;;
-        5) run_kpatch_deps ;;
-        6)
-            echo "  完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix"
-            echo ""
-            echo "  方案对比:"
-            echo "  - nested=0:     docs/nested-disable.md"
-            echo "  - ftrace 热修复: docs/ftrace-hotfix.md"
-            echo "  - kpatch:       docs/kpatch-rhel8.md"
-            echo "  - 内核重编译:   docs/manual-patch.md"
-            echo "  - 内核升级 7.1: docs/kernel-upgrade.md"
+        5)
+            if [ "$IS_RHEL8" -eq 1 ]; then
+                run_kpatch_deps
+            else
+                show_docs
+            fi
             ;;
+        6) show_docs ;;
         0) exit 0 ;;
         *) warn "无效选择" ;;
     esac
+}
+
+show_docs() {
+    echo "  完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix"
+    echo ""
+    echo "  各方案明细:"
+    echo "  - nested=0:     docs/nested-disable.md"
+    echo "  - ftrace 热修复: docs/ftrace-hotfix.md"
+    echo "  - kpatch:       docs/kpatch-rhel8.md"
+    echo "  - 内核重编译:   docs/manual-patch.md"
+    echo "  - 内核升级 7.1: docs/kernel-upgrade.md"
 }
 
 # ── 主入口 ───────────────────────────────────────────────────────────
