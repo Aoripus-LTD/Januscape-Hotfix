@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta85"
+VERSION="v26.7.8-beta86"
 
 set -e
 
@@ -72,6 +72,12 @@ run_kpatch_deps(){
     case "$KVER" in
         408|496|500|553)
             ok "内核 ${KVER} 匹配预编译补丁"
+
+            # 确保 kpatch 已安装 (load 需要)
+            if ! command -v kpatch &>/dev/null; then
+                log "安装 kpatch..."
+                yum install -y kpatch 2>/dev/null | tail -3 || dnf install -y kpatch 2>/dev/null | tail -3
+            fi
 
             # 尝试直接下载预编译 .ko (GitHub → 自建 CDN fallback)
             local LOADED=0
