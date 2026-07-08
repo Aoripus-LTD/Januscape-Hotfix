@@ -264,7 +264,9 @@ main() {
         read -p "  进入交互菜单? [Y/n] " ANS </dev/tty
     fi
     if [ "$ANS" != "n" ] && [ "$ANS" != "N" ]; then
-        show_menu
+        while true; do
+            show_menu
+        done
     fi
 }
 
