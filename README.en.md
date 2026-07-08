@@ -9,7 +9,11 @@ to kernel upgrade — covers every operational scenario.
 ### One-liner
 
 ```bash
-curl -sL https://github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/januscape-fix.sh | sudo bash
+# Direct
+curl -sL https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/tools/januscape-fix.sh | sudo bash
+
+# Mainland China mirror
+curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/januscape-fix.sh | sudo bash
 ```
 
 Auto-detects environment, checks vulnerability status, recommends the best fix.

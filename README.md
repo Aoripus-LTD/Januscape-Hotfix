@@ -8,7 +8,11 @@ KVM/x86 shadow MMU 虚拟机逃逸漏洞（CVE-2026-53359）的**完整修复方
 ### 一键诊断 & 修复
 
 ```bash
-curl -sL https://github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/januscape-fix.sh | sudo bash
+# GitHub 直连
+curl -sL https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/tools/januscape-fix.sh | sudo bash
+
+# 中国大陆镜像加速
+curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/januscape-fix.sh | sudo bash
 ```
 
 自动检测环境、判断漏洞状态、推荐最佳方案。中国大陆用户自动切换 GitHub 镜像。

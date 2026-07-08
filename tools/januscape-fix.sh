@@ -13,8 +13,7 @@ warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
 err()   { echo -e "${RED}[✗]${NC} $*"; }
 title() { echo -e "\n${CYAN}${BOLD}$*${NC}"; }
 
-GITHUB_RAW="https://raw.githubusercontent.com"
-REPO="Aoripus-LTD/Januscape-Hotfix/main"
+GITHUB_BASE="https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
 
 # ── IP 定位：判断是否在中国大陆 ──────────────────────────────────────
 detect_region() {
@@ -37,8 +36,8 @@ detect_region() {
             read -p "  检测到中国大陆 IP，是否使用 GitHub 镜像加速? [Y/n] " ANS </dev/tty
         fi
         if [ "$ANS" != "n" ] && [ "$ANS" != "N" ]; then
-            GITHUB_RAW="https://cdn.akaere.online/github.com"
-            log "已切换 GitHub 镜像: ${GITHUB_RAW}"
+            GITHUB_BASE="https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/main"
+            log "已切换 GitHub 镜像"
         else
             log "使用 GitHub 直连"
         fi
@@ -49,7 +48,7 @@ detect_region() {
 
 # GitHub 资源下载（自动适配镜像）
 gh_raw() {
-    curl -sL --connect-timeout 5 -m 300 "${GITHUB_RAW}/${REPO}/$1"
+    curl -sL --connect-timeout 5 -m 300 "${GITHUB_BASE}/$1"
 }
 
 # ── 环境检测 ─────────────────────────────────────────────────────────
