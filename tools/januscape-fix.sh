@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta77"
+VERSION="v26.7.8-beta79"
 
 set -e
 
@@ -269,7 +269,7 @@ EOF
                 NEW_LINE=$(grep -n 'shadow_walk_okay.*shadow_walk_next' "$SRC_FILE" | head -1 | cut -d: -f1)
                 if [ -n "$NEW_LINE" ] && [ "$NEW_LINE" != "672" ]; then
                     local OLD_LINE=672
-                    sed -i "s/@@ -${OLD_LINE},14 +${OLD_LINE},/@@ -${NEW_LINE},14 +${NEW_LINE},/" fix.patch
+                    sed -i "s/@@ -${OLD_LINE},12 +${OLD_LINE},/@@ -${NEW_LINE},12 +${NEW_LINE},/" fix.patch
                     log "自适应行号: ${OLD_LINE} → ${NEW_LINE}"
                 fi
             fi
@@ -294,10 +294,18 @@ EOF
                     warn "补丁文件格式错误 — 请重新下载最新版本"
                 elif grep -q 'kernel.*source\|Downloading kernel' "$BLOG" 2>/dev/null | grep -q 'ERROR\|Failed' 2>/dev/null; then
                     warn "内核源码下载失败 — Source 仓库不可用"
+                elif grep -q 'different.*function\|code.*structure' "$BLOG" 2>/dev/null; then
+                    warn "内核代码结构不同 — 该子版本可能已包含修复"
+                    echo "  替代方案: nested=0 或 内核升级 7.1"
                 else
                     warn "编译失败，详情: $BLOG"
                     grep -i 'error\|failed' "$BLOG" | tail -3
                 fi
+            fi
+
+            # 检查文件是否已经被打 patch (打过了会报 "already patched")
+            if grep -q 'already patched\|Reversed\|previously applied' "$BLOG" 2>/dev/null; then
+                warn "补丁已经应用过了（可能内核自带修复）"
             fi
 
             # 恢复原始 repo 文件
