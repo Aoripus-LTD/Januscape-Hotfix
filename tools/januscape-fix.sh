@@ -211,8 +211,60 @@ EOF
     fi
 
     echo ""
-    log "环境准备完成。下一步: kpatch-build --skip-compiler-check <patch-file>"
-    echo "  详见: docs/kpatch-rhel8.md"
+    log "环境准备完成。"
+
+    # 询问是否直接开始打补丁
+    echo ""
+    local ans3
+    if [ -t 0 ]; then
+        read -p "  是否立即开始 kpatch-build 编译补丁? [y/N] " ans3
+    else
+        read -p "  是否立即开始 kpatch-build 编译补丁? [y/N] " ans3 </dev/tty
+    fi
+    if [ "$ans3" = "y" ] || [ "$ans3" = "Y" ]; then
+        local PATCHDIR=$(mktemp -d)
+        log "下载补丁文件..."
+        local PATCH_URL="https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/docs/cve-2026-53359-rhel418-livepatch.patch"
+        curl -sL --connect-timeout 5 -m 30 -o "$PATCHDIR/fix.patch" "$PATCH_URL" 2>/dev/null
+        if [ -f "$PATCHDIR/fix.patch" ] && grep -q 'kvm_mmu_page' "$PATCHDIR/fix.patch" 2>/dev/null; then
+            cd "$PATCHDIR"
+            log "开始 kpatch-build (预计 10-20 分钟)..."
+            kpatch-build --skip-compiler-check fix.patch 2>&1 | tail -10
+            if ls kpatch-*.ko 2>/dev/null; then
+                ok "补丁编译完成: $(ls kpatch-*.ko)"
+                echo ""
+                if [ -t 0 ]; then
+                    read -p "  是否立即加载补丁? [y/N] " ans5
+                else
+                    read -p "  是否立即加载补丁? [y/N] " ans5 </dev/tty
+                fi
+                if [ "$ans5" = "y" ] || [ "$ans5" = "Y" ]; then
+                    kpatch load kpatch-*.ko
+                    ok "补丁已加载"
+                    echo ""
+                    if [ -t 0 ]; then
+                        read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans6
+                    else
+                        read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans6 </dev/tty
+                    fi
+                    if [ "$ans6" != "n" ] && [ "$ans6" != "N" ]; then
+                        detect_env
+                    fi
+                fi
+            else
+                warn "编译完成但未找到 .ko 文件，请检查编译日志"
+            fi
+            cd - >/dev/null
+        else
+            warn "补丁文件下载失败，手动执行:"
+            echo "  kpatch-build --skip-compiler-check <patch-file>"
+            echo "  详见: docs/kpatch-rhel8.md"
+        fi
+        rm -rf "$PATCHDIR"
+    else
+        echo "  手动执行: kpatch-build --skip-compiler-check <patch-file>"
+        echo "  详见: docs/kpatch-rhel8.md"
+    fi
 }
 
 detect_region() {
@@ -440,6 +492,13 @@ show_menu() {
         0) exit 0 ;;
         *) warn "无效选择" ;;
     esac
+    echo ""
+    if [ -t 0 ]; then
+        read -p "  按 Enter 返回主菜单 (输入 0 退出)..." PAUSE
+    else
+        read -p "  按 Enter 返回主菜单 (输入 0 退出)..." PAUSE </dev/tty
+    fi
+    [ "$PAUSE" = "0" ] && exit 0
 }
 
 show_docs() {
