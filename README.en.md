@@ -17,7 +17,7 @@ curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/m
 ```
 
 Auto-detects environment, checks vulnerability status, recommends the best fix.
-Auto-switches to GitHub mirror for users in mainland China.
+Multi-mirror auto-fallback — no manual switching needed.
 
 | | Detail |
 |---|---|

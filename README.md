@@ -15,7 +15,7 @@ curl -sL https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/too
 curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/januscape-fix.sh | sudo bash
 ```
 
-自动检测环境、判断漏洞状态、推荐最佳方案。中国大陆用户自动切换 GitHub 镜像。
+自动检测环境、判断漏洞状态、推荐最佳方案。多镜像自动 fallback，无需手动切换。
 
 | | 详情 |
 |---|---|

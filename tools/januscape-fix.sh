@@ -1,6 +1,6 @@
 #!/bin/bash
 # Januscape (CVE-2026-53359) — 全功能一键修复脚本
-# 自动检测环境、推荐方案、支持中国大陆 GitHub 镜像加速
+# 自动检测环境、推荐方案、多镜像自动 fallback
 
 set -e
 
@@ -15,56 +15,40 @@ title() { echo -e "\n${CYAN}${BOLD}$*${NC}"; }
 
 GITHUB_BASE="https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
 
-# ── IP 定位：判断是否在中国大陆 ──────────────────────────────────────
-detect_region() {
-    local country
-    country=$(curl -s --connect-timeout 3 -m 5 ipinfo.io 2>/dev/null | \
-              grep -oP '"country"\s*:\s*"\K[^"]+')
+MIRRORS=(
+    "https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/main"
+    "https://ghproxy.net/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
+    "https://gh-proxy.org/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
+    "https://v4.gh-proxy.org/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
+    "https://v6.gh-proxy.org/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
+    "https://cdn.gh-proxy.org/https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
+)
 
-    # ipinfo.io 被墙时 fallback
-    if [ -z "$country" ]; then
-        country=$(curl -s --connect-timeout 3 -m 5 https://api.myip.la/cn?json 2>/dev/null | \
-                  grep -oP '"country_code"\s*:\s*"\K[^"]+')
-    fi
-
-    if [ "$country" = "CN" ]; then
-        echo ""
-        # 管道执行时 stdin 不是终端，用 /dev/tty 接管交互
-        if [ -t 0 ]; then
-            read -p "  检测到中国大陆 IP，是否使用 GitHub 镜像加速? [Y/n] " ANS
-        else
-            read -p "  检测到中国大陆 IP，是否使用 GitHub 镜像加速? [Y/n] " ANS </dev/tty
-        fi
-        if [ "$ANS" != "n" ] && [ "$ANS" != "N" ]; then
-            GITHUB_BASE="https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/main"
-            log "已切换 GitHub 镜像"
-        else
-            log "使用 GitHub 直连"
-        fi
-    else
-        log "IP 归属: ${country:-未知}，使用 GitHub 直连"
-    fi
-}
-
-# GitHub 资源下载（自动适配镜像）
-gh_raw() {
-    local tmp
+try_fetch() {
+    local path="$1" tmp url
     tmp=$(mktemp)
-    if curl -sL --connect-timeout 5 -m 30 -o "$tmp" "${GITHUB_BASE}/$1" 2>/dev/null; then
-        head -1 "$tmp" | grep -qE '^#!(/bin/bash|/bin/sh|/usr/bin/env)' || {
-            err "下载校验失败 ($1 返回非脚本内容，镜像可能不可用)"
-            rm -f "$tmp"
-            return 1
-        }
-        cat "$tmp"
-        rm -f "$tmp"
-        return 0
-    fi
-    rm -f "$tmp"
-    return 1
+    url="${GITHUB_BASE}/${path}"
+    curl -sL --connect-timeout 3 -m 15 -o "$tmp" "$url" 2>/dev/null && \
+        head -1 "$tmp" | grep -qE '^#!(/bin/bash|/bin/sh|/usr/bin/env)' && {
+            cat "$tmp"; rm -f "$tmp"; return 0; }
+    for url in "${MIRRORS[@]}"; do
+        curl -sL --connect-timeout 3 -m 15 -o "$tmp" "${url}/${path}" 2>/dev/null && \
+            head -1 "$tmp" | grep -qE '^#!(/bin/bash|/bin/sh|/usr/bin/env)' && {
+                log "镜像: ${url%%/https*}" ; cat "$tmp"; rm -f "$tmp"; return 0; }
+    done
+    err "下载失败: $path (直连及所有镜像均不可用)"
+    rm -f "$tmp"; return 1
 }
 
-# ── 环境检测 ─────────────────────────────────────────────────────────
+run_audit()      { try_fetch tools/januscape-check.sh   | bash; }
+run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
+run_kpatch_deps(){ try_fetch tools/kpatch-deps.sh        | bash; }
+
+detect_region() {
+    local c; c=$(curl -s --connect-timeout 3 -m 5 ipinfo.io 2>/dev/null | grep -oP '"country"\s*:\s*"\K[^"]+')
+    [ -z "$c" ] && c=$(curl -s --connect-timeout 3 -m 5 https://api.myip.la/cn?json 2>/dev/null | grep -oP '"country_code"\s*:\s*"\K[^"]+')
+    log "IP: ${c:-未知} | 下载自动 fallback 多镜像"
+}
 detect_env() {
     title "环境检测"
 
@@ -176,32 +160,6 @@ recommend() {
     echo "  完整对比: https://github.com/Aoripus-LTD/Januscape-Hotfix"
 }
 
-# ── 在线执行子脚本 ───────────────────────────────────────────────────
-run_audit() {
-    local content
-    content=$(gh_raw tools/januscape-check.sh) || {
-        err "审计脚本下载失败，尝试切换镜像或使用直连"
-        return
-    }
-    echo "$content" | bash
-}
-run_logcheck() {
-    local content
-    content=$(gh_raw tools/januscape-logcheck.sh) || {
-        err "取证脚本下载失败，尝试切换镜像或使用直连"
-        return
-    }
-    echo "$content" | bash
-}
-run_kpatch_deps() {
-    local content
-    content=$(gh_raw tools/kpatch-deps.sh) || {
-        err "kpatch 依赖脚本下载失败，尝试切换镜像或使用直连"
-        return
-    }
-    echo "$content" | bash
-}
-
 # ── 菜单 ─────────────────────────────────────────────────────────────
 show_menu() {
     echo ""
@@ -245,9 +203,9 @@ show_menu() {
         4)
             log "下载并编译 ftrace 热修复模块..."
             TMPD=$(mktemp -d)
-            gh_raw kmod/hotfix.c      > "$TMPD/hotfix.c"
-            gh_raw kmod/offsets_db.h   > "$TMPD/offsets_db.h"
-            gh_raw kmod/Makefile       > "$TMPD/Makefile"
+            try_fetch kmod/hotfix.c      > "$TMPD/hotfix.c"
+            try_fetch kmod/offsets_db.h   > "$TMPD/offsets_db.h"
+            try_fetch kmod/Makefile       > "$TMPD/Makefile"
 
             cd "$TMPD"
             if make KDIR="/lib/modules/$KERNEL/build" 2>&1 | tail -5; then
