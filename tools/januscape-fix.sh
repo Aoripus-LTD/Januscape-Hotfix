@@ -1,8 +1,10 @@
 #!/bin/bash
 # Januscape (CVE-2026-53359) — 全功能一键修复脚本
-# 自动检测环境、推荐方案、多镜像自动 fallback
+# ⚠️  本脚本未经过充分测试，仅供参考。优先建议按文档手动操作。
+# 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
+# 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta54"
+VERSION="v26.7.8-beta55"
 
 set -e
 
