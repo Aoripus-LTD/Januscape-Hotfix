@@ -3,17 +3,15 @@
 # Copyright (c) 2026 AORIPUS (BEIJING) TECHNOLOGY CO., LTD.
 # Copyright (c) 2026 GEELINX LTD.
 #
-# Builds a kernel module that livepatches kvm_mmu_get_child_sp()
-# to add role.word comparison, fixing the shadow MMU use-after-free.
-#
-# Works on all Linux kernel trees >= 4.0 (tested: RHEL/CentOS/Debian/Ubuntu).
+# Supports two build modes:
+#   1. kernel-devel only (default)     — kallsyms-based, works everywhere
+#   2. kernel-devel + linux-source     — native KVM types, best compatibility
 #
 # Usage:
-#   make                    Build for the running kernel
-#   make KDIR=/path         Build for a specific kernel tree
-#   make all-kernels        Build for all installed kernel-devel
-#   make check              Verify build prerequisites (dry run)
-#   make clean              Remove build artifacts
+#   make                          Build with kernel-devel only
+#   make KSRC=/path/to/kernel     Build with full kernel source for KVM headers
+#   make all-kernels              Build for all installed kernel-devel
+#   make clean                    Remove build artifacts
 
 obj-m := hotfix.o
 
@@ -23,9 +21,21 @@ KVER           := $(shell uname -r)
 KARCH          := $(shell uname -m)
 ARTIFACT_DIR   ?= $(PWD)/artifacts
 ARTIFACT       := $(ARTIFACT_DIR)/hotfix-$(KVER)-$(KARCH).ko
-OFFSETS_CFLAGS ?=
 
-ccflags-y += $(OFFSETS_CFLAGS) -Wall -Wno-declaration-after-statement
+# Auto-detect linux-source
+KSRC ?= $(shell \
+  src="/usr/src/kernels/$(KVER)";          [ -f "$$src/arch/x86/kvm/mmu/mmu_internal.h" ] && echo "$$src" && exit; \
+  src="/usr/src/linux-$(KVER)";            [ -f "$$src/arch/x86/kvm/mmu/mmu_internal.h" ] && echo "$$src" && exit; \
+  for d in /usr/src/linux-source-* /usr/src/linux-*; do \
+    [ -f "$$d/arch/x86/kvm/mmu/mmu_internal.h" ] && echo "$$d" && exit; \
+  done)
+
+ifneq ($(KSRC),)
+  ccflags-y += -DHAS_KVM_SOURCE -I$(KSRC)/arch/x86/kvm -I$(KSRC)/arch/x86/kvm/mmu
+  HAS_KVM_SRC := y
+endif
+
+ccflags-y += -Wall -Wno-declaration-after-statement
 
 .PHONY: all check artifact clean install uninstall all-kernels
 
@@ -42,22 +52,19 @@ check:
 		exit 1; \
 	fi
 	@if [ -f "$(KDIR)/.config" ]; then \
-		if ! grep -q 'CONFIG_DYNAMIC_FTRACE=y' "$(KDIR)/.config"; then \
-			echo "  WARNING: CONFIG_DYNAMIC_FTRACE not set — module may not work"; \
-		else \
-			echo "  CONFIG_DYNAMIC_FTRACE: y"; \
-		fi; \
-		if ! grep -q 'CONFIG_KALLSYMS_ALL=y' "$(KDIR)/.config"; then \
-			echo "  WARNING: CONFIG_KALLSYMS_ALL not set — internal KVM symbols may be invisible"; \
-		else \
-			echo "  CONFIG_KALLSYMS_ALL: y"; \
-		fi; \
+		grep -q 'CONFIG_LIVEPATCH=y' "$(KDIR)/.config" && echo "  CONFIG_LIVEPATCH: y" || echo "  WARNING: CONFIG_LIVEPATCH not set"; \
+		grep -q 'CONFIG_KALLSYMS_ALL=y' "$(KDIR)/.config" && echo "  CONFIG_KALLSYMS_ALL: y" || echo "  WARNING: CONFIG_KALLSYMS_ALL not set"; \
 	else \
 		echo "  WARNING: no .config found at $(KDIR)"; \
 	fi
-	@echo "  gfn_offset hint (default):   0x38"
-	@echo "  role_word_offset hint (default): 0x28"
-	@echo "  Use the Go installer for automatic BTF/DWARF offset detection."
+ifneq ($(KSRC),)
+	@echo "  KSRC: $(KSRC) — native KVM types enabled"
+else
+	@echo "  KSRC: not found — kallsyms fallback mode"
+	@echo "  Install linux-source for best compatibility:"
+	@echo "    RHEL/CentOS: yum install kernel-source-$(KVER)"
+	@echo "    Debian/Ubuntu: apt install linux-source-$(KVER)"
+endif
 
 # Invoke kernel build system to compile hotfix.ko
 modules:
@@ -101,8 +108,8 @@ install: all
 	cp hotfix.ko /lib/modules/$(KVER)/extra/
 	@depmod -a $(KVER) 2>/dev/null || true
 	@echo ">>> Installed: /lib/modules/$(KVER)/extra/hotfix.ko"
-	@echo ">>> Load:   insmod hotfix gfn_off=0x38 role_off=0x28"
-	@echo ">>> Unload: rmmod hotfix"
+	@echo ">>> Load:   insmod hotfix"
+	@echo ">>> Unload: echo 0 > /sys/kernel/livepatch/hotfix/enabled"
 
 uninstall:
 	rm -f /lib/modules/$(KVER)/extra/hotfix.ko

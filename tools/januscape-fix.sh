@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta109"
+VERSION="v26.7.8-beta113"
 
 set -e
 
@@ -629,6 +629,27 @@ show_menu() {
             cat "/sys/module/${KVM_MOD}/parameters/nested"
             ;;
         4)
+            # 确保 linux-source 可用 (native 模式需要 KVM 内部头文件)
+            local SRC_DIR="/usr/src/kernels/$KERNEL"
+            [ ! -d "$SRC_DIR" ] && SRC_DIR=$(ls -d /usr/src/linux-source-* /usr/src/linux-* 2>/dev/null | head -1)
+            if [ ! -f "$SRC_DIR/arch/x86/kvm/mmu/mmu_internal.h" ] 2>/dev/null; then
+                warn "KVM 内部头文件缺失 (mmu_internal.h)，尝试安装..."
+                # RHEL/CentOS: kernel-devel 本身就含 KVM 源码
+                yum install -y kernel-devel-$KERNEL 2>/dev/null | tail -3 || \
+                dnf install -y kernel-devel-$KERNEL 2>/dev/null | tail -3 || \
+                # 再试 kernel-source / linux-source
+                { yum install -y kernel-source 2>/dev/null || \
+                  dnf install -y kernel-source 2>/dev/null || \
+                  apt install -y linux-source 2>/dev/null; } | tail -3 || true
+                SRC_DIR="/usr/src/kernels/$KERNEL"
+                [ ! -d "$SRC_DIR" ] && SRC_DIR=$(ls -d /usr/src/linux-source-* /usr/src/linux-* 2>/dev/null | head -1)
+            fi
+            if [ -f "$SRC_DIR/arch/x86/kvm/mmu/mmu_internal.h" ] 2>/dev/null; then
+                ok "KVM 内部头文件可用 → native 模式"
+            else
+                warn "无法获取 KVM 内部头文件，使用 fallback 模式"
+                warn "fallback 模式在 RHEL 8 / TencentOS 等内核上可能不可用"
+            fi
             log "下载并编译 livepatch 热修复模块..."
             # 确保 kernel-devel 可用
             if [ ! -f "/lib/modules/$KERNEL/build/Makefile" ]; then
@@ -652,7 +673,11 @@ show_menu() {
             try_fetch kmod/Makefile     > "$TMPD/Makefile"    || { err "下载失败"; return; }
             cd "$TMPD"
             if make KDIR="/lib/modules/$KERNEL/build" 2>&1 | tail -5; then
-                insmod hotfix.ko
+                insmod hotfix.ko 2>&1 || {
+                    err "模块加载失败——可能缺少所需内核符号"
+                    warn "详情: dmesg | grep hotfix | tail -5"
+                    dmesg | grep hotfix | tail -5
+                    cd - >/dev/null; rm -rf "$TMPD"; return; }
                 dmesg | grep -E 'PATCH ACTIVE|januscape' | tail -5
                 echo ""
                 ok "livepatch 已加载"
