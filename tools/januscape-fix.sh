@@ -2,6 +2,8 @@
 # Januscape (CVE-2026-53359) — 全功能一键修复脚本
 # 自动检测环境、推荐方案、多镜像自动 fallback
 
+VERSION="v26.7.8-beta51"
+
 set -e
 
 RED='\033[31m'; GREEN='\033[32m'; YELLOW='\033[33m'; BLUE='\033[34m'; CYAN='\033[36m'; NC='\033[0m'
@@ -14,6 +16,21 @@ err()   { echo -e "${RED}[✗]${NC} $*"; }
 title() { echo -e "\n${CYAN}${BOLD}$*${NC}"; }
 
 GITHUB_BASE="https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main"
+
+# ── 版本校验：本地 vs 远程 ─────────────────────────────────────────
+check_version() {
+    local remote_ver
+    remote_ver=$(curl -sL --connect-timeout 3 -m 5 \
+        "https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/tools/januscape-fix.sh" 2>/dev/null | \
+        grep '^VERSION=' | head -1 | cut -d'"' -f2)
+    if [ -n "$remote_ver" ] && [ "$remote_ver" != "$VERSION" ]; then
+        warn "当前版本: $VERSION — 最新版本: $remote_ver"
+        warn "你运行的可能是旧版缓存，建议重新下载:"
+        echo "  curl -sL https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/tools/januscape-fix.sh | sudo bash"
+    else
+        log "脚本版本: $VERSION (最新)"
+    fi
+}
 
 MIRRORS=(
     "https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/main"
@@ -533,6 +550,7 @@ main() {
     fi
 
     detect_region
+    check_version
     detect_env
     recommend
 
