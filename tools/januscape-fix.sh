@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta68"
+VERSION="v26.7.8-beta70"
 
 set -e
 
@@ -262,19 +262,18 @@ EOF
         curl -sL --connect-timeout 5 -m 30 -o "$PATCHDIR/fix.patch" "$PATCH_URL" 2>/dev/null
         if [ -f "$PATCHDIR/fix.patch" ] && grep -q 'kvm_mmu_page' "$PATCHDIR/fix.patch" 2>/dev/null; then
             cd "$PATCHDIR"
-            # 禁用已失效的 CentOS 官方 Source 仓库
-            dnf config-manager --disable baseos-source appstream-source \
-                extras-source powertools-source epel-source 2>/dev/null || true
-            # 配可用的 Rocky vault Source 仓库
-            cat > /etc/yum.repos.d/centos-source.repo << 'EOF'
-[centos-source]
-name=CentOS 8 Stream Source (Rocky Vault)
-baseurl=https://dl.rockylinux.org/vault/centos/8-stream/BaseOS/Source/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-EOF
+            # 备份并全局替换 repo 中已失效的 vault.centos.org → Rocky vault
+            local REPO_BAK=$(mktemp -d)
+            cp /etc/yum.repos.d/*.repo "$REPO_BAK/" 2>/dev/null
+            sed -i 's|vault\.centos\.org/centos-vault|dl.rockylinux.org/vault/centos|g' \
+                /etc/yum.repos.d/*.repo 2>/dev/null
+
             log "开始 kpatch-build (预计 10-20 分钟)..."
+            kpatch-build --skip-compiler-check fix.patch 2>&1 | tail -10 || true
+
+            # 恢复原始 repo 文件
+            cp "$REPO_BAK"/*.repo /etc/yum.repos.d/ 2>/dev/null
+            rm -rf "$REPO_BAK"
             kpatch-build --skip-compiler-check fix.patch 2>&1 | tail -10
             if ls kpatch-*.ko 2>/dev/null; then
                 ok "补丁编译完成: $(ls kpatch-*.ko)"
