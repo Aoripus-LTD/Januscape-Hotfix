@@ -207,7 +207,14 @@ EOF
         make -C "$TMPD/kpatch" -j$(nproc) 2>&1 | tail -3
         make -C "$TMPD/kpatch" install 2>&1 | tail -1
         rm -rf "$TMPD"
-        ok "kpatch 安装完成"
+        # kpatch-build 有时装到 /usr/local/sbin
+        export PATH="/usr/local/sbin:/usr/local/bin:$PATH"
+        if command -v kpatch-build &>/dev/null; then
+            ok "kpatch 安装完成 ($(which kpatch-build))"
+        else
+            warn "kpatch 编译完成但 kpatch-build 未找到"
+            warn "请手动确认: ls /usr/local/sbin/kpatch-build"
+        fi
     fi
 
     echo ""
