@@ -18,19 +18,21 @@ REPO="Aoripus-LTD/Januscape-Hotfix/main"
 
 # ── IP 定位：判断是否在中国大陆 ──────────────────────────────────────
 detect_region() {
-    local ip_info
-    # 用多个来源做 fallback
-    ip_info=$(curl -s --connect-timeout 3 -m 5 "https://api.ip.sb/geoip" 2>/dev/null || \
-              curl -s --connect-timeout 3 -m 5 "https://ipapi.co/json/" 2>/dev/null || \
-              curl -s --connect-timeout 3 -m 5 "https://api.myip.la/cn?json" 2>/dev/null)
+    local country
+    country=$(curl -s --connect-timeout 3 -m 5 ipinfo.io 2>/dev/null | \
+              grep -oP '"country"\s*:\s*"\K[^"]+')
 
-    if echo "$ip_info" | grep -qiE '"country_code"\s*:\s*"CN"|"country"\s*:\s*"China"|中国'; then
-        IN_CHINA=1
-        GITHUB_RAW="https://cdn.akaere.online/github.com"
-        log "检测到中国大陆 IP，自动切换 GitHub 镜像: ${GITHUB_RAW}"
+    if [ "$country" = "CN" ]; then
+        echo ""
+        read -p "  检测到中国大陆 IP，是否使用 GitHub 镜像加速? [Y/n] " ANS
+        if [ "$ANS" != "n" ] && [ "$ANS" != "N" ]; then
+            GITHUB_RAW="https://cdn.akaere.online/github.com"
+            log "已切换 GitHub 镜像: ${GITHUB_RAW}"
+        else
+            log "使用 GitHub 直连"
+        fi
     else
-        IN_CHINA=0
-        log "检测到境外 IP，使用 GitHub 直连"
+        log "IP 归属: ${country:-未知}，使用 GitHub 直连"
     fi
 }
 
@@ -131,17 +133,17 @@ recommend() {
     echo ""
 
     if [ "$IS_RHEL8" -eq 1 ]; then
-        echo "  ${BOLD}推荐方案:${NC}"
+        echo -e "  ${BOLD}推荐方案:${NC}"
         echo "    1. nested=0          — 最简 (如可接受关闭嵌套)"
         echo "    2. kpatch            — 在线修复 (RHEL 8.x 专用)"
         echo "    3. 内核升级 7.1       — 永久修复"
     elif [ "$VMS" -eq 0 ]; then
-        echo "  ${BOLD}推荐方案:${NC}"
+        echo -e "  ${BOLD}推荐方案:${NC}"
         echo "    1. nested=0          — 最简 (无 VM, 直接关嵌套)"
         echo "    2. ftrace 热修复     — 在线修复"
         echo "    3. 内核升级 7.1       — 永久修复"
     else
-        echo "  ${BOLD}推荐方案:${NC}"
+        echo -e "  ${BOLD}推荐方案:${NC}"
         echo "    1. ftrace 热修复     — ${VMS}台 VM 在线修复, 不停机"
         echo "    2. nested=0          — 需停 VM 重载 KVM"
         echo "    3. 内核升级 7.1       — 需全部停机重启"
@@ -164,11 +166,11 @@ show_menu() {
     echo "  内核: $KERNEL | 虚拟化: $VIRT_TYPE"
     echo "═══════════════════════════════════════════"
     echo ""
-    echo "  ${BOLD}排查${NC}"
+    echo -e "  ${BOLD}排查${NC}"
     echo "  1) 集群审计            (januscape-check.sh)"
     echo "  2) 崩溃日志取证        (januscape-logcheck.sh)"
     echo ""
-    echo "  ${BOLD}修复${NC}"
+    echo -e "  ${BOLD}修复${NC}"
     echo "  3) nested=0 一键关闭嵌套"
     echo "  4) ftrace 热修复        (编译 & 加载)"
     echo "  5) kpatch 依赖检查      (RHEL 8.x 专用)"
