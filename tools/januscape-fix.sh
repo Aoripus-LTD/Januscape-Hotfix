@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta56"
+VERSION="v26.7.8-beta57"
 
 set -e
 
@@ -174,45 +174,24 @@ EOF
         [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
     fi
 
-    # 方法 2: 直接搜索 BaseOS 同目录下的 debuginfo RPM
+    # 方法 2: 官方 debuginfo 仓库直下 (跳过不会有的 BaseOS 目录)
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
-        warn "debuginfo-install 失败，直接搜索 BaseOS 仓库内的 debuginfo 包..."
-        local DEVEL_URL=""
-        # 从已安装的 kernel-devel 包反查仓库 URL
-        DEVEL_URL=$(dnf repoquery --location kernel-devel-$(uname -r | sed 's/\.x86_64//') 2>/dev/null | head -1)
-        if [ -n "$DEVEL_URL" ]; then
-            local BASE_URL="${DEVEL_URL%/*}"
-            # debuginfo 与内核包同目录 (Packages/k/)
-            curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-${KVR}.rpm \
-                "${BASE_URL}/k/kernel-debuginfo-${KVR}.x86_64.rpm" 2>/dev/null
-            curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
-                "${BASE_URL}/k/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
-            if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
-                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null
-                [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
-            fi
-        fi
-    fi
-
-    # 方法 3: 手动配已知可用的 debuginfo 源
-    if [ "$DEBUGINFO_OK" -eq 0 ]; then
-        warn "直接搜索失败，尝试已知 debuginfo 镜像..."
+        warn "debuginfo-install 失败，从官方仓库直接下载..."
+        local KVR=$(uname -r | sed 's/\.x86_64//')
         for URL in \
             "http://debuginfo.centos.org/8-stream/x86_64" \
             "https://dl.rockylinux.org/pub/rocky/8.10/devel/x86_64/os"; do
             curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-${KVR}.rpm \
-                "${URL}/Packages/k/kernel-debuginfo-${KVR}.x86_64.rpm" 2>/dev/null
+                "${URL}/Packages/kernel-debuginfo-${KVR}.x86_64.rpm" 2>/dev/null
             curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
-                "${URL}/Packages/k/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
+                "${URL}/Packages/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
             if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
                 rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null
-                [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
-                break
+                [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1 && break
             fi
         done
+        rm -f /tmp/kernel-debuginfo-*.rpm
     fi
-
-    rm -f /tmp/kernel-debuginfo-*.rpm
 
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
         err "debuginfo 安装失败 — 内核 $(uname -r) 无可用调试符号包"
