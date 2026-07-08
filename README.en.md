@@ -6,6 +6,15 @@ Complete fix collection for the CVE-2026-53359 guest-to-host escape
 vulnerability in the KVM/x86 shadow MMU. From zero-downtime livepatch
 to kernel upgrade — covers every operational scenario.
 
+### One-liner
+
+```bash
+curl -sL https://github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/januscape-fix.sh | sudo bash
+```
+
+Auto-detects environment, checks vulnerability status, recommends the best fix.
+Auto-switches to GitHub mirror for users in mainland China.
+
 | | Detail |
 |---|---|
 | **CVE** | CVE-2026-53359 |
@@ -62,10 +71,13 @@ QEMU is not a security boundary — patch KVM regardless.
 │   ├── nested-disable.md
 │   ├── ftrace-hotfix.md
 │   ├── kpatch-rhel8.md
+│   ├── kernel-upgrade.md
 │   └── manual-patch.md
-├── tools/                # Fleet audit scripts
-│   ├── januscape-check.sh
-│   └── januscape-logcheck.sh
+├── tools/                # Ops tooling scripts
+│   ├── januscape-fix.sh        # All-in-one toolbox (recommended entry)
+│   ├── januscape-check.sh      # Fleet audit
+│   ├── januscape-logcheck.sh   # Crash log forensics
+│   └── kpatch-deps.sh          # kpatch dependency check
 └── apply.sh              # Shell deploy (simple)
 ```
 

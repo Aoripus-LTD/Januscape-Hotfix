@@ -5,6 +5,14 @@
 KVM/x86 shadow MMU 虚拟机逃逸漏洞（CVE-2026-53359）的**完整修复方案集合**。
 从零停机热修复到内核升级，覆盖所有运维场景。
 
+### 一键诊断 & 修复
+
+```bash
+curl -sL https://github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/januscape-fix.sh | sudo bash
+```
+
+自动检测环境、判断漏洞状态、推荐最佳方案。中国大陆用户自动切换 GitHub 镜像。
+
 | | 详情 |
 |---|---|
 | **CVE 编号** | CVE-2026-53359 |
@@ -61,10 +69,13 @@ QEMU 不是安全边界——无论 QEMU 什么版本都应修补 KVM。
 │   ├── nested-disable.md
 │   ├── ftrace-hotfix.md
 │   ├── kpatch-rhel8.md
+│   ├── kernel-upgrade.md
 │   └── manual-patch.md
-├── tools/                # 集群审计脚本
-│   ├── januscape-check.sh
-│   └── januscape-logcheck.sh
+├── tools/                # 运维工具脚本
+│   ├── januscape-fix.sh        # 一键工具箱 (推荐入口)
+│   ├── januscape-check.sh      # 集群审计
+│   ├── januscape-logcheck.sh   # 崩溃日志取证
+│   └── kpatch-deps.sh          # kpatch 依赖检查
 └── apply.sh              # Shell 部署（简易版）
 ```
 
