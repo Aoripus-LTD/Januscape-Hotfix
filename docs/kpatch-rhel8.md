@@ -102,7 +102,7 @@ if (is_shadow_present_pte(*it.sptep)) {
 
 ## 致谢
 
-`FNAME(fetch)` 调用点校验的思路来自社区安全研究者对 Januscape 漏洞
-在 RHEL 8.x 4.18 内核上的适配工作。`kvm_mmu_get_page` 与
+`FNAME(fetch)` 调用点校验的思路来自社区安全研究者**极点**对 Januscape
+漏洞在 RHEL 8.x 4.18 内核上的适配工作。`kvm_mmu_get_page` 与
 `kvm_mmu_get_child_sp` 的命名差异及 ABI 不兼容问题最早由
 [@Huan-Starvm](https://code.yesongit.com) 在 issue #1 中提交并定位。
