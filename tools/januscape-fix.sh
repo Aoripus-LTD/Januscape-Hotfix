@@ -74,7 +74,7 @@ run_kpatch_deps(){
         cat > /etc/yum.repos.d/centos-stream-8-debuginfo.repo << 'EOF'
 [centos-stream-8-debuginfo]
 name=CentOS Stream 8 Debuginfo
-baseurl=http://vault.centos.org/centos/8-stream/Debuginfo/x86_64/os/
+baseurl=https://mirrors.aliyun.com/centos-vault/8-stream/Debuginfo/x86_64/os/
 enabled=1
 gpgcheck=0
 skip_if_unavailable=1
