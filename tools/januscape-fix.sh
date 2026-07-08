@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta96"
+VERSION="v26.7.8-beta97"
 
 set -e
 
@@ -554,15 +554,21 @@ show_menu() {
     echo "  ┌──────────┬──────┬──────┬────────────┬──────────┬────────────┬──────────┬────────────────────────────────┐"
     echo "  │ 方案     │ 推荐 │ 成功率 │ 宿主机重启 │ VM 重启  │ 生效时间   │ 长期有效 │ 影响                           │"
     echo "  ├──────────┼──────┼──────┼────────────┼──────────┼────────────┼──────────┼────────────────────────────────┤"
-    echo "  │ nested=0 │ 高   │ 低   │ KVM 重载   │ √        │ 即时       │ ✓        │ 无法在 VM 内创建嵌套虚拟机     │"
+    echo "  │ nested=0 │ ⭐3  │10/10│ KVM 重载   │ √        │ VM/KVM重启后│ ✓       │ 无法在 VM 内创建嵌套虚拟机     │"
     if [ "$IS_RHEL8" -eq 1 ]; then
         echo "  │ kpatch   │ ⭐4  │ 6/10 │ ✕          │ ✕        │ 即时       │ ✓        │ 编译可能报错，需灵活调整依赖   │"
     else
         echo "  │ livepatch │ ⭐5  │ 8/10 │ ✕          │ ✕        │ 即时       │ ✓        │ 双fix: DoS+UAF逃逸链           │"
     fi
     echo "  │ 重编译   │ ⭐2  │ 9/10 │ √          │ √        │ 编译+重启  │ ✓        │ 一次修改永久有效，不依赖补丁   │"
-    echo "  │ 升级 7.1 │ 高   │ 中   │ √          │ √        │ 30分钟+重启│ ✓        │ 主线上游已含；魔方云修软链接   │"
+    echo "  │ 升级 7.1 │ ⭐3  │ 9/10 │ √          │ √        │ 30分钟+重启│ ✓        │ 主线上游已含；魔方云修软链接   │"
     echo "  └──────────┴──────┴──────┴────────────┴──────────┴────────────┴──────────┴────────────────────────────────┘"
+    # 绿色高亮 livepatch 推荐行 (内核 >= 4.12)
+    local MAJOR=$(uname -r | cut -d. -f1)
+    local MINOR=$(uname -r | cut -d. -f2)
+    if [ "$MAJOR" -gt 4 ] || ([ "$MAJOR" -eq 4 ] && [ "$MINOR" -ge 12 ]); then
+        echo -e "  ${GREEN}→ 内核 ≥ 4.12，强烈推荐 livepatch 方案${NC}"
+    fi
     echo ""
     echo -e "  ${BOLD}操作${NC}"
     echo "  1) 集群审计                2) 崩溃日志取证"
@@ -627,6 +633,18 @@ show_menu() {
             if make KDIR="/lib/modules/$KERNEL/build" 2>&1 | tail -5; then
                 insmod hotfix.ko
                 dmesg | grep -E 'PATCH ACTIVE|januscape' | tail -5
+                echo ""
+                ok "livepatch 已加载"
+                echo "  卸载: echo 0 > /sys/kernel/livepatch/hotfix/enabled"
+                echo "  重载: insmod hotfix.ko"
+                echo ""
+                local ans_recheck
+                if [ -t 0 ]; then
+                    read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans_recheck
+                else
+                    read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans_recheck </dev/tty
+                fi
+                [ "$ans_recheck" != "n" ] && [ "$ans_recheck" != "N" ] && detect_env
             else
                 err "编译失败，请检查 kernel-devel 是否安装"
             fi
