@@ -157,65 +157,51 @@ livepatch___link_shadow_page(void *kvm, void *cache, u64 *sptep,
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
- *  Livepatch definitions
+ *  Livepatch definitions — dynamic: patch what we can resolve
  * ═══════════════════════════════════════════════════════════════════════ */
 
-static struct klp_func funcs[] = {
-	{
-		.old_name = "kvm_mmu_get_child_sp",
-		.new_func = livepatch_kvm_mmu_get_child_sp,
-	},
-	{
-		.old_name = "__link_shadow_page",
-		.new_func = livepatch___link_shadow_page,
-	},
-	{ }
-};
-
+static struct klp_func funcs[3];  /* up to 2 fixes + sentinel */
 static struct klp_object objs[] = {
 	{ .name = "kvm", .funcs = funcs },
 	{ }
 };
-
 static struct klp_patch patch = {
 	.mod = THIS_MODULE,
 	.objs = objs,
 };
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  Init / Exit
- * ═══════════════════════════════════════════════════════════════════════ */
-
 static int __init livepatch_init(void)
 {
-	int ret;
+	int ret, fix_count = 0;
 
 	pr_info("═══════════════════════════════════════════\n");
 	pr_info("Januscape (CVE-2026-53359) livepatch\n");
 	pr_info("Kernel: %s\n", UTS_RELEASE);
-	pr_info("Fixes: 81ccda30b4e8 + 0cb2af2ea66ad\n");
 	pr_info("gfn_off=0x%lx  role_off=0x%lx\n", gfn_off, role_off);
 
 	ret = resolve_kln();
 	if (ret) { pr_err("kallsyms_lookup_name unavailable\n"); return ret; }
 
-	/* Fix 1: kvm_mmu_get_child_sp */
+	/* Fix 1: kvm_mmu_get_child_sp — needs all child_role + shadow_page + pte helpers */
 	fn_kvm_mmu_child_role = resolve("kvm_mmu_child_role");
-	if (!fn_kvm_mmu_child_role) return -ENOENT;
-
-	fn_get_shadow_page = resolve("__kvm_mmu_get_shadow_page");
-	if (!fn_get_shadow_page)
-		fn_get_shadow_page = resolve("kvm_mmu_get_shadow_page");
-	if (!fn_get_shadow_page) {
-		pr_err("cannot resolve shadow page allocator\n");
-		return -ENOENT;
-	}
-
 	fn_is_shadow_present_pte = resolve("is_shadow_present_pte");
 	fn_is_large_pte          = resolve("is_large_pte");
 	fn_spte_to_child_sp      = resolve("spte_to_child_sp");
 
-	/* Fix 2: __link_shadow_page */
+	fn_get_shadow_page = resolve("__kvm_mmu_get_shadow_page");
+	if (!fn_get_shadow_page)
+		fn_get_shadow_page = resolve("kvm_mmu_get_shadow_page");
+
+	if (fn_kvm_mmu_child_role && fn_get_shadow_page) {
+		funcs[fix_count].old_name = "kvm_mmu_get_child_sp";
+		funcs[fix_count].new_func = livepatch_kvm_mmu_get_child_sp;
+		fix_count++;
+		pr_info("  Fix 1: kvm_mmu_get_child_sp (role.word) — 81ccda30b4e8\n");
+	} else {
+		pr_warn("  Fix 1 skipped: missing kvm_mmu_child_role or shadow page allocator\n");
+	}
+
+	/* Fix 2: __link_shadow_page — needs zap_pte + pte_list_add + commit_zap + flush + make_nonleaf */
 	fn_sptep_to_sp       = resolve("sptep_to_sp");
 	fn_mmu_page_zap_pte  = resolve("mmu_page_zap_pte");
 	fn_pte_list_add      = resolve("pte_list_add");
@@ -226,16 +212,25 @@ static int __init livepatch_init(void)
 	fn_make_nonleaf_spte = resolve("make_nonleaf_spte");
 	fn_sp_ad_disabled    = resolve("sp_ad_disabled");
 
-	if (!fn_mmu_page_zap_pte || !fn_pte_list_add || !fn_commit_zap_page ||
-	    !fn_flush_remote_tlbs || !fn_make_nonleaf_spte)
-		pr_warn("__link_shadow_page symbols missing — fix 2 inactive\n");
+	if (fn_mmu_page_zap_pte && fn_pte_list_add && fn_commit_zap_page &&
+	    fn_flush_remote_tlbs && fn_make_nonleaf_spte) {
+		funcs[fix_count].old_name = "__link_shadow_page";
+		funcs[fix_count].new_func = livepatch___link_shadow_page;
+		fix_count++;
+		pr_info("  Fix 2: __link_shadow_page (UAF escape)    — 0cb2af2ea66ad\n");
+	} else {
+		pr_warn("  Fix 2 skipped: missing link_shadow_page helpers\n");
+	}
+
+	if (fix_count == 0) {
+		pr_err("No fixes could be applied — kernel API not supported\n");
+		return -ENOTSUPP;
+	}
 
 	ret = klp_enable_patch(&patch);
 	if (ret) { pr_err("klp_enable_patch failed: %d\n", ret); return ret; }
 
-	pr_info("PATCH ACTIVE\n");
-	pr_info("  Fix 1: kvm_mmu_get_child_sp (role.word)   — 81ccda30b4e8\n");
-	pr_info("  Fix 2: __link_shadow_page (UAF escape)    — 0cb2af2ea66ad\n");
+	pr_info("PATCH ACTIVE (%d/%d fixes applied)\n", fix_count, 2);
 	pr_info("Rollback: echo 0 > /sys/kernel/livepatch/%s/enabled\n", KBUILD_MODNAME);
 	pr_info("═══════════════════════════════════════════\n");
 	return 0;

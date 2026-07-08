@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta106"
+VERSION="v26.7.8-beta108"
 
 set -e
 
@@ -460,6 +460,10 @@ detect_env() {
         PATCHED=1
     elif kpatch list 2>/dev/null | grep -q enabled; then
         ok "  kpatch 补丁: 已加载"
+        PATCHED=1
+    elif [ -f "/sys/kernel/livepatch/hotfix/enabled" ] && \
+         [ "$(cat /sys/kernel/livepatch/hotfix/enabled 2>/dev/null)" = "1" ]; then
+        ok "  livepatch 补丁: 已加载"
         PATCHED=1
     else
         warn "  上游补丁: 未安装 (存在漏洞)"
