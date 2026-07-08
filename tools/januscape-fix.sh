@@ -45,17 +45,18 @@ run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
 run_kpatch_deps(){
     log "kpatch 编译环境准备"
 
-    # 前置检查: kernel-devel 是否存在
+    # 前置检查: kernel-devel
     if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
         err "当前内核 $(uname -r) 的 kernel-devel 包不存在"
-        warn "kpatch 需要与内核精确匹配的开发包和调试符号，"
-        warn "TencentOS / 定制内核通常不提供这些包。"
+        warn "kpatch 需要与内核精确匹配的开发包"
+        warn "定制内核或已 EOL 的发行版通常不提供。"
         echo ""
         echo "  替代方案:"
         echo "    1. nested=0 关闭嵌套虚拟化 (无需编译)"
         echo "    2. 内核升级 7.1  (源码编译，自带补丁)"
         return
     fi
+    ok "kernel-devel 可用"
 
     echo "  将安装: gcc make ccache elfutils pesign openssl 等编译依赖"
     echo "  以及内核调试符号包 (kernel-debuginfo)"
@@ -73,50 +74,80 @@ run_kpatch_deps(){
     log "安装编译工具链..."
     dnf install -y gcc make ccache git wget elfutils elfutils-devel \
                    elfutils-libelf-devel pesign yum-utils openssl-devel \
-                   rpm-build kernel-devel-$(uname -r) 2>/dev/null | tail -3
-
-    if [ -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
-        ok "kernel-devel 可用"
-    else
-        err "kernel-devel 安装失败，kpatch 无法继续"
-        return
-    fi
+                   rpm-build 2>/dev/null | tail -3
+    ok "编译工具链已就绪"
 
     local KVR=$(uname -r | sed 's/\.x86_64//')
     local DEBUGINFO_OK=0
-    log "安装 kernel-debuginfo..."
+    local DISTRO_ID=""
+
+    # 识别 RHEL 8 系发行版
+    if [ -f /etc/os-release ]; then
+        DISTRO_ID=$(grep -oP '^ID="?\K[^"]+' /etc/os-release)
+    fi
+    if grep -qi rocky /etc/os-release 2>/dev/null; then DISTRO_ID="rocky"; fi
+    if grep -qi alma  /etc/os-release 2>/dev/null; then DISTRO_ID="alma"; fi
+
+    log "安装 kernel-debuginfo (内核 $(uname -r), 发行版: ${DISTRO_ID:-未知})..."
+
+    # 尝试 1: 默认仓库
     if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
                      kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
         DEBUGINFO_OK=1
-    else
-        warn "默认仓库无 debuginfo，尝试配置 vault 镜像..."
-        cat > /etc/yum.repos.d/centos-stream-8-debuginfo.repo << 'EOF'
-[centos-stream-8-debuginfo]
-name=CentOS Stream 8 Debuginfo
-baseurl=https://mirrors.aliyun.com/centos-vault/8-stream/Debuginfo/x86_64/os/
+    fi
+
+    # 尝试 2: 按发行版自动配 vault
+    if [ "$DEBUGINFO_OK" -eq 0 ]; then
+        local VAULT_BASE=""
+        case "$DISTRO_ID" in
+            rocky)
+                local RV=$(grep -oP '^VERSION_ID="?\K[0-9.]+' /etc/os-release)
+                VAULT_BASE="https://dl.rockylinux.org/vault/rocky/${RV}" ;;
+            alma)
+                local AV=$(grep -oP '^VERSION_ID="?\K[0-9.]+' /etc/os-release)
+                VAULT_BASE="https://repo.almalinux.org/vault/${AV}" ;;
+            *)
+                VAULT_BASE="https://mirrors.aliyun.com/centos-vault/8-stream" ;;
+        esac
+
+        if [ -n "$VAULT_BASE" ]; then
+            warn "默认仓库无 debuginfo，尝试 ${DISTRO_ID:-vault} 仓库..."
+            cat > /etc/yum.repos.d/el8-vault-debuginfo.repo << EOF
+[el8-vault-baseos]
+name=EL8 Vault BaseOS
+baseurl=${VAULT_BASE}/BaseOS/x86_64/os/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+
+[el8-vault-debuginfo]
+name=EL8 Vault Debuginfo
+baseurl=${VAULT_BASE}/Debuginfo/x86_64/os/
 enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 EOF
-        dnf clean metadata 2>/dev/null
-        if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
-                         kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
-            DEBUGINFO_OK=1
+            dnf clean metadata 2>/dev/null
+            if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
+                             kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
+                DEBUGINFO_OK=1
+            fi
         fi
     fi
 
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
         err "debuginfo 安装失败 — 内核 $(uname -r) 无可用调试符号包"
-        warn "此内核已从发行版仓库移除 (EOL)，无法通过 kpatch 修补。"
+        warn "kpatch 无法在此内核上编译。"
         echo ""
         echo "  替代方案:"
         echo "    1. nested=0 关闭嵌套虚拟化 (无需编译)"
         echo "    2. 内核升级 7.1   (源码编译，自带补丁)"
-        echo "    3. ftrace 热修复  (需 CONFIG_KALLSYMS_ALL=y)"
-        rm -f /etc/yum.repos.d/centos-stream-8-debuginfo.repo
+        rm -f /etc/yum.repos.d/el8-vault-debuginfo.repo
         return
     fi
     ok "debuginfo 安装完成"
+
+    rm -f /etc/yum.repos.d/el8-vault-debuginfo.repo
 
     if command -v kpatch &>/dev/null; then
         ok "kpatch 已安装: $(kpatch --version 2>&1 | head -1)"

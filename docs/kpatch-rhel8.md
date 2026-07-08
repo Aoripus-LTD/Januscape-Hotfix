@@ -1,4 +1,4 @@
-# kpatch 热修复 — RHEL 8.x / CentOS 8 / 魔方云（内核 4.18）
+# kpatch 热修复 — RHEL 8.x / CentOS 8 / Rocky 8 / Alma 8 / 魔方云（内核 4.18）
 
 这些系统的 4.18 内核将 shadow page 分配函数命名为 `kvm_mmu_get_page`（6 参数），
 而我们的 ftrace 模块替换目标是 `kvm_mmu_get_child_sp`（5 参数），
