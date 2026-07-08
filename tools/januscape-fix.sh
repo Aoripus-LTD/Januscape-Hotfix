@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta67"
+VERSION="v26.7.8-beta68"
 
 set -e
 
@@ -262,7 +262,10 @@ EOF
         curl -sL --connect-timeout 5 -m 30 -o "$PATCHDIR/fix.patch" "$PATCH_URL" 2>/dev/null
         if [ -f "$PATCHDIR/fix.patch" ] && grep -q 'kvm_mmu_page' "$PATCHDIR/fix.patch" 2>/dev/null; then
             cd "$PATCHDIR"
-            # 配 CentOS Source 仓库 (kpatch-build 需要 src.rpm)
+            # 禁用已失效的 CentOS 官方 Source 仓库
+            dnf config-manager --disable baseos-source appstream-source \
+                extras-source powertools-source epel-source 2>/dev/null || true
+            # 配可用的 Rocky vault Source 仓库
             cat > /etc/yum.repos.d/centos-source.repo << 'EOF'
 [centos-source]
 name=CentOS 8 Stream Source (Rocky Vault)
