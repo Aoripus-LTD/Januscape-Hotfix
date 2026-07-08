@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta59"
+VERSION="v26.7.8-beta60"
 
 set -e
 
@@ -184,9 +184,9 @@ EOF
             "https://dl.rockylinux.org/pub/rocky/8.10/devel/x86_64/os"; do
             log "下载 ${URL##*/}..."
             curl -#L --connect-timeout 10 -m 600 -o /tmp/kernel-debuginfo-${KVR}.rpm \
-                "${URL}/Packages/kernel-debuginfo-${KVR}.x86_64.rpm" 2>/dev/null
+                "${URL}/Packages/kernel-debuginfo-${KVR}.x86_64.rpm"
             curl -#L --connect-timeout 10 -m 600 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
-                "${URL}/Packages/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
+                "${URL}/Packages/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm"
             if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
                 rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null
                 [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1 && break
