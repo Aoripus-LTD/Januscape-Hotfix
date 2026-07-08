@@ -34,6 +34,8 @@ curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/m
 | **[nested=0](docs/nested-disable.md)** | 高 | 低 | KVM 重载 | √ | 即时 | ✓ | 无法在 VM 内创建嵌套虚拟机 |
 | **[ftrace](docs/ftrace-hotfix.md)** | 低 | 高 | ✕ | ✕ | 即时 | ✓ | 对内核版本精度要求高 |
 | **[kpatch](docs/kpatch-rhel8.md)** | 高 | 中 | ✕ | ✕ | 即时 | ✓ | 编译可能报错，需灵活调整 |
+| **[重编译](docs/manual-patch.md)** | 高 | 高 | √ | √ | 编译+重启 | ✓ | 一次永久有效，不依赖补丁 |
+| **[升级 7.1](docs/kernel-upgrade.md)** | 高 | 中 | √ | √ | 30分钟+重启 | ✓ | 主线上游已含；魔方云修软链接 |
 
 > **kpatch 仅支持已验证的内核子版本: 4.18.0-408, 496, 500, 553 (el8)**
 > 脚本会在编译前检查内核版本，不匹配时提示替代方案。
@@ -43,8 +45,6 @@ curl -sL https://cdn.akaere.online/github.com/Aoripus-LTD/Januscape-Hotfix/raw/m
 - [kpatch](docs/kpatch-rhel8.md)
 - [重编译](docs/manual-patch.md)
 - [升级 7.1](docs/kernel-upgrade.md)
-| **[重编译](docs/manual-patch.md)** | 高 | 高 | √ | √ | 编译+重启 | ✓ | 一次永久有效，不依赖补丁 |
-| **[升级 7.1](docs/kernel-upgrade.md)** | 高 | 中 | √ | √ | 30分钟+重启 | ✓ | 主线上游已含；魔方云修软链接 |
 
 ## 快速检测
 
