@@ -44,6 +44,19 @@ run_audit()      { try_fetch tools/januscape-check.sh   | bash; }
 run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
 run_kpatch_deps(){
     log "kpatch 编译环境准备"
+
+    # 前置检查: kernel-devel 是否存在
+    if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
+        err "当前内核 $(uname -r) 的 kernel-devel 包不存在"
+        warn "kpatch 需要与内核精确匹配的开发包和调试符号，"
+        warn "TencentOS / 定制内核通常不提供这些包。"
+        echo ""
+        echo "  替代方案:"
+        echo "    1. nested=0 关闭嵌套虚拟化 (无需编译)"
+        echo "    2. 内核升级 7.1  (源码编译，自带补丁)"
+        return
+    fi
+
     echo "  将安装: gcc make ccache elfutils pesign openssl 等编译依赖"
     echo "  以及内核调试符号包 (kernel-debuginfo)"
     echo ""
@@ -57,20 +70,26 @@ run_kpatch_deps(){
         warn "已取消"; return
     fi
 
-    # 先装基础依赖
     log "安装编译工具链..."
     dnf install -y gcc make ccache git wget elfutils elfutils-devel \
                    elfutils-libelf-devel pesign yum-utils openssl-devel \
-                   rpm-build kernel-devel-$(uname -r) 2>&1 | tail -3
+                   rpm-build kernel-devel-$(uname -r) 2>/dev/null | tail -3
 
-    # 调试符号包分发行版处理
+    if [ -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
+        ok "kernel-devel 可用"
+    else
+        err "kernel-devel 安装失败，kpatch 无法继续"
+        return
+    fi
+
     local KVR=$(uname -r | sed 's/\.x86_64//')
+    local DEBUGINFO_OK=0
     log "安装 kernel-debuginfo..."
     if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
                      kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
-        ok "debuginfo 安装完成"
+        DEBUGINFO_OK=1
     else
-        warn "默认仓库无 debuginfo，尝试配置 CentOS Stream 8..."
+        warn "默认仓库无 debuginfo，尝试配置 vault 镜像..."
         cat > /etc/yum.repos.d/centos-stream-8-debuginfo.repo << 'EOF'
 [centos-stream-8-debuginfo]
 name=CentOS Stream 8 Debuginfo
@@ -80,12 +99,25 @@ gpgcheck=0
 skip_if_unavailable=1
 EOF
         dnf clean metadata 2>/dev/null
-        dnf install -y kernel-debuginfo-${KVR}.x86_64 \
-                       kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>&1 | tail -5 \
-            || warn "debuginfo 仍安装失败，请手动安装后重试"
+        if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
+                         kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
+            DEBUGINFO_OK=1
+        fi
     fi
 
-    # 编译 kpatch
+    if [ "$DEBUGINFO_OK" -eq 0 ]; then
+        err "debuginfo 安装失败 — 内核 $(uname -r) 无可用调试符号包"
+        warn "此内核已从发行版仓库移除 (EOL)，无法通过 kpatch 修补。"
+        echo ""
+        echo "  替代方案:"
+        echo "    1. nested=0 关闭嵌套虚拟化 (无需编译)"
+        echo "    2. 内核升级 7.1   (源码编译，自带补丁)"
+        echo "    3. ftrace 热修复  (需 CONFIG_KALLSYMS_ALL=y)"
+        rm -f /etc/yum.repos.d/centos-stream-8-debuginfo.repo
+        return
+    fi
+    ok "debuginfo 安装完成"
+
     if command -v kpatch &>/dev/null; then
         ok "kpatch 已安装: $(kpatch --version 2>&1 | head -1)"
     else
@@ -250,7 +282,7 @@ show_menu() {
     echo "  │ 升级 7.1 │ 高   │ 中   │ √          │ √        │ 30分钟+重启│ ✓        │ 主线上游已含；魔方云修软链接   │"
     echo "  └──────────┴──────┴──────┴────────────┴──────────┴────────────┴──────────┴────────────────────────────────┘"
     echo ""
-    echo "  ${BOLD}操作${NC}"
+    echo -e "  ${BOLD}操作${NC}"
     echo "  1) 集群审计                2) 崩溃日志取证"
     echo "  3) nested=0 一键关闭      4) ftrace 编译加载"
     if [ "$IS_RHEL8" -eq 1 ]; then
