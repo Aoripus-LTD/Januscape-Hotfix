@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta86"
+VERSION="v26.7.8-beta87"
 
 set -e
 
@@ -458,6 +458,9 @@ detect_env() {
     # 上游补丁状态
     if grep -q 'role.word' /proc/kallsyms 2>/dev/null; then
         ok "  上游补丁: 已安装"
+        PATCHED=1
+    elif kpatch list 2>/dev/null | grep -q enabled; then
+        ok "  kpatch 补丁: 已加载"
         PATCHED=1
     else
         warn "  上游补丁: 未安装 (存在漏洞)"
