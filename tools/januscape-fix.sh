@@ -42,7 +42,7 @@ try_fetch() {
 
 run_audit()      { try_fetch tools/januscape-check.sh   | bash; }
 run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
-run_kpatch_deps(){ try_fetch tools/kpatch-deps.sh        | bash; }
+run_kpatch_deps(){ log "运行 kpatch 编译环境准备 (仅检查 & 安装依赖)"; try_fetch tools/kpatch-deps.sh | bash; }
 
 detect_region() {
     local c; c=$(curl -s --connect-timeout 3 -m 5 ipinfo.io 2>/dev/null | grep -oP '"country"\s*:\s*"\K[^"]+')
@@ -195,7 +195,7 @@ show_menu() {
     echo "  1) 集群审计                2) 崩溃日志取证"
     echo "  3) nested=0 一键关闭      4) ftrace 编译加载"
     if [ "$IS_RHEL8" -eq 1 ]; then
-        echo "  5) kpatch 依赖检查 (RHEL8) 6) 查看完整文档"
+        echo "  5) kpatch 环境准备 (依赖检查 & 安装)  6) 查看完整文档"
     else
         echo "  5) 查看完整文档"
     fi
@@ -213,15 +213,35 @@ show_menu() {
         1) run_audit ;;
         2) run_logcheck ;;
         3)
+            if [ "$VMS" -gt 0 ]; then
+                warn "当前有 ${VMS} 台 VM 正在运行！关闭嵌套虚拟化需要重载 KVM 模块，"
+                warn "这会导致所有 VM 被强制关机。"
+                echo ""
+                local ans1 ans2
+                if [ -t 0 ]; then
+                    read -p "  确认关机全部 ${VMS} 台 VM? [y/N] " ans1
+                else
+                    read -p "  确认关机全部 ${VMS} 台 VM? [y/N] " ans1 </dev/tty
+                fi
+                if [ "$ans1" != "y" ] && [ "$ans1" != "Y" ]; then
+                    warn "已取消"; return
+                fi
+                if [ -t 0 ]; then
+                    read -p "  再次确认: 这将不可逆地关闭所有 VM，继续? [y/N] " ans2
+                else
+                    read -p "  再次确认: 这将不可逆地关闭所有 VM，继续? [y/N] " ans2 </dev/tty
+                fi
+                if [ "$ans2" != "y" ] && [ "$ans2" != "Y" ]; then
+                    warn "已取消"; return
+                fi
+                log "正在关闭所有 VM..."
+                virsh list --name 2>/dev/null | xargs -r -I{} virsh destroy {}
+                sleep 3
+            fi
             echo "options $KVM_MOD nested=0" > /etc/modprobe.d/disable-nested.conf
             ok "已写入 /etc/modprobe.d/disable-nested.conf (重启后永久生效)"
-            if [ "$VMS" -eq 0 ]; then
-                log "无 VM 运行，立即重载 KVM..."
-                rmmod $KVM_MOD 2>/dev/null && modprobe $KVM_MOD nested=0
-                cat "/sys/module/${KVM_MOD}/parameters/nested"
-            else
-                warn "$VMS 台 VM 在运行，请先关闭或等待下次重启生效"
-            fi
+            rmmod $KVM_MOD 2>/dev/null && modprobe $KVM_MOD nested=0
+            cat "/sys/module/${KVM_MOD}/parameters/nested"
             ;;
         4)
             log "下载并编译 ftrace 热修复模块..."
