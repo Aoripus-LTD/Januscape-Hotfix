@@ -48,7 +48,20 @@ detect_region() {
 
 # GitHub 资源下载（自动适配镜像）
 gh_raw() {
-    curl -sL --connect-timeout 5 -m 300 "${GITHUB_BASE}/$1"
+    local tmp
+    tmp=$(mktemp)
+    if curl -sL --connect-timeout 5 -m 30 -o "$tmp" "${GITHUB_BASE}/$1" 2>/dev/null; then
+        head -1 "$tmp" | grep -qE '^#!(/bin/bash|/bin/sh|/usr/bin/env)' || {
+            err "下载校验失败 ($1 返回非脚本内容，镜像可能不可用)"
+            rm -f "$tmp"
+            return 1
+        }
+        cat "$tmp"
+        rm -f "$tmp"
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
 }
 
 # ── 环境检测 ─────────────────────────────────────────────────────────
@@ -164,9 +177,30 @@ recommend() {
 }
 
 # ── 在线执行子脚本 ───────────────────────────────────────────────────
-run_audit()    { gh_raw tools/januscape-check.sh    | bash; }
-run_logcheck() { gh_raw tools/januscape-logcheck.sh  | bash; }
-run_kpatch_deps() { gh_raw tools/kpatch-deps.sh | bash; }
+run_audit() {
+    local content
+    content=$(gh_raw tools/januscape-check.sh) || {
+        err "审计脚本下载失败，尝试切换镜像或使用直连"
+        return
+    }
+    echo "$content" | bash
+}
+run_logcheck() {
+    local content
+    content=$(gh_raw tools/januscape-logcheck.sh) || {
+        err "取证脚本下载失败，尝试切换镜像或使用直连"
+        return
+    }
+    echo "$content" | bash
+}
+run_kpatch_deps() {
+    local content
+    content=$(gh_raw tools/kpatch-deps.sh) || {
+        err "kpatch 依赖脚本下载失败，尝试切换镜像或使用直连"
+        return
+    }
+    echo "$content" | bash
+}
 
 # ── 菜单 ─────────────────────────────────────────────────────────────
 show_menu() {
