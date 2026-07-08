@@ -9,13 +9,13 @@
  * builds the kernel module, and applies it without rebooting.
  *
  * USAGE:
- *   januscape-hotfix deploy           Detect, build, deploy
- *   januscape-hotfix deploy --force   Skip confirmation prompts
- *   januscape-hotfix check            Dry-run: check everything, don't apply
- *   januscape-hotfix rollback         Remove livepatch
- *   januscape-hotfix status           Show current state
- *   januscape-hotfix build            Build module only (don't deploy)
- *   januscape-hotfix build --all      Build for all installed kernels
+ *   januscape-fix deploy           Detect, build, deploy
+ *   januscape-fix deploy --force   Skip confirmation prompts
+ *   januscape-fix check            Dry-run: check everything, don't apply
+ *   januscape-fix rollback         Remove livepatch
+ *   januscape-fix status           Show current state
+ *   januscape-fix build            Build module only (don't deploy)
+ *   januscape-fix build --all      Build for all installed kernels
  *
  * PREREQUISITES (on target host):
  *   - kernel-devel / linux-headers matching running kernel
@@ -136,13 +136,13 @@ func usage() {
 	fmt.Println(`Januscape (CVE-2026-53359) Hotfix Installer
 
 Usage:
-  januscape-hotfix deploy            Detect, build, deploy (interactive)
-  januscape-hotfix deploy --force    Skip confirmation
-  januscape-hotfix check             Dry-run check only
-  januscape-hotfix rollback          Remove livepatch
-  januscape-hotfix status            Show current state
-  januscape-hotfix build             Build module only
-  januscape-hotfix build --all       Build for all installed kernels`)
+  januscape-fix deploy            Detect, build, deploy (interactive)
+  januscape-fix deploy --force    Skip confirmation
+  januscape-fix check             Dry-run check only
+  januscape-fix rollback          Remove livepatch
+  januscape-fix status            Show current state
+  januscape-fix build             Build module only
+  januscape-fix build --all       Build for all installed kernels`)
 }
 
 func parseFlags(cfg *Config, args []string) {
@@ -496,7 +496,7 @@ func deployModule(cfg *Config) error {
 		fmt.Println("  ┌──────────────────────────────────────────────────────┐")
 		fmt.Println("  │  About to livepatch KVM's shadow MMU.                │")
 		fmt.Println("  │  Zero-downtime — no VM interruption.                │")
-		fmt.Println("  │  Rollback: januscape-hotfix rollback                │")
+		fmt.Println("  │  Rollback: januscape-fix rollback                │")
 		fmt.Println("  └──────────────────────────────────────────────────────┘")
 		fmt.Print("  Continue? [y/N] ")
 		var ans string
@@ -697,8 +697,8 @@ func deploy(cfg *Config) {
 	fmt.Println()
 	printBanner("DEPLOYED — CVE-2026-53359 mitigated")
 	fmt.Println("  VMs affected:    0 (zero-downtime)")
-	fmt.Println("  Rollback:        januscape-hotfix rollback")
-	fmt.Println("  Status:          januscape-hotfix status")
+	fmt.Println("  Rollback:        januscape-fix rollback")
+	fmt.Println("  Status:          januscape-fix status")
 	fmt.Println()
 }
 

@@ -15,6 +15,7 @@ modules.order
 
 # Go
 installer/januscape-hotfix
+installer/januscape-fix
 installer/vendor/
 
 # Artifacts directory

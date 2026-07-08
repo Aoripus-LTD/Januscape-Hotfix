@@ -1,8 +1,9 @@
-# Januscape 热修复 — CVE-2026-53359
+# Januscape 修复方案库 — CVE-2026-53359
 
 [English](README.en.md)
 
-KVM/x86 shadow MMU 虚拟机逃逸漏洞。**大多数方案无需重启，零停机修复。**
+KVM/x86 shadow MMU 虚拟机逃逸漏洞（CVE-2026-53359）的**完整修复方案集合**。
+从零停机热修复到内核升级，覆盖所有运维场景。
 
 | | 详情 |
 |---|---|

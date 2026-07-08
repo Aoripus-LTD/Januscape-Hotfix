@@ -1,9 +1,10 @@
-# Januscape Hotfix — CVE-2026-53359
+# Januscape Fix Library — CVE-2026-53359
 
 [简体中文](README.md)
 
-Guest-to-host escape vulnerability in the KVM/x86 shadow MMU.
-**Zero-downtime fixes available — no reboot required for most methods.**
+Complete fix collection for the CVE-2026-53359 guest-to-host escape
+vulnerability in the KVM/x86 shadow MMU. From zero-downtime livepatch
+to kernel upgrade — covers every operational scenario.
 
 | | Detail |
 |---|---|

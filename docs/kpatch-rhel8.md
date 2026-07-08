@@ -20,7 +20,7 @@ ABI 不兼容，ftrace 方案无法工作。
 ### 1. 依赖检查
 
 ```bash
-curl -sL https://code.yesongit.com/Akiame/Januscape-Hotfix/raw/branch/main/tools/kpatch-deps.sh | bash
+curl -sL https://github.com/Aoripus-LTD/Januscape-Hotfix/raw/main/tools/kpatch-deps.sh | bash
 ```
 
 脚本会自动检测并安装所有缺失依赖。

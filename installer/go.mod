@@ -1,4 +1,4 @@
-module github.com/vps-provider/januscape-hotfix
+module github.com/Aoripus-LTD/Januscape-Hotfix/installer
 
 go 1.21
 
