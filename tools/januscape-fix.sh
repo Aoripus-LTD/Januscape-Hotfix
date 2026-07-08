@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta113"
+VERSION="v26.7.8-beta114"
 
 set -e
 
@@ -69,7 +69,7 @@ run_kpatch_deps(){
     local KO_URL="https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}"
 
     case "$KVER" in
-        408|496|500|553)
+        408|496|500|552|553)
             ok "内核 ${KVER} 匹配预编译补丁"
 
             # 确保 kpatch 已安装 (load 需要)
@@ -455,7 +455,15 @@ detect_env() {
     fi
 
     # 上游补丁状态
-    if grep -q 'role.word' /proc/kallsyms 2>/dev/null; then
+    local MAJ MIN PAT
+    MAJ=$(echo "$KERNEL" | cut -d. -f1)
+    MIN=$(echo "$KERNEL" | cut -d. -f2)
+    PAT=$(echo "$KERNEL" | cut -d. -f3 | grep -oP '^\d+')
+    # 内核 >= 7.1.3 已包含上游修复
+    if [ "$MAJ" -gt 7 ] || ([ "$MAJ" -eq 7 ] && [ "$MIN" -ge 1 ] && [ "${PAT:-0}" -ge 3 ]); then
+        ok "  内核 ≥ 7.1.3 — 已内置上游修复"
+        PATCHED=1
+    elif grep -q 'role.word' /proc/kallsyms 2>/dev/null; then
         ok "  上游补丁: 已安装"
         PATCHED=1
     elif kpatch list 2>/dev/null | grep -q enabled; then
