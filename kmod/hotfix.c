@@ -437,19 +437,60 @@ static void *resolve(const char *name)
 
 static int safety_checks(void)
 {
+	const char *fallback_names[] = {
+		"kvm_mmu_get_child_sp",
+		"kvm_mmu_get_page",      /* RHEL 8.x 4.18 — different ABI */
+		NULL
+	};
+	int i;
+
 	if (!kl("kvm_init")) {
 		pr_err("kvm module is not loaded — nothing to patch\n");
 		return -ENODEV;
 	}
 	pr_info("kvm module: loaded\n");
 
-	target_ip = kl("kvm_mmu_get_child_sp");
+	for (i = 0; fallback_names[i]; i++) {
+		target_ip = kl(fallback_names[i]);
+		if (target_ip) {
+			pr_info("target function: %pS (as \"%s\")\n",
+				(void *)target_ip, fallback_names[i]);
+			break;
+		}
+	}
+
 	if (!target_ip) {
-		pr_err("kvm_mmu_get_child_sp not in kallsyms.\n");
-		pr_err("Requires CONFIG_KALLSYMS_ALL=y.\n");
+		pr_err("No compatible KVM MMU function found in kallsyms.\n");
+		pr_err("Checked: kvm_mmu_get_child_sp, kvm_mmu_get_page\n");
+		pr_err("This kernel's shadow MMU API is not supported.\n");
+		pr_err("Recommend: nested=0 or kernel upgrade.\n");
 		return -ENOENT;
 	}
-	pr_info("target function: %pS\n", (void *)target_ip);
+
+	/*
+	 * RHEL 8.x 4.18 kernels use kvm_mmu_get_page with a different
+	 * function signature (6 args vs 5 for kvm_mmu_get_child_sp).
+	 * ftrace redirection requires ABI-compatible replacement functions,
+	 * so we cannot safely patch this variant. Refuse to load with
+	 * a clear explanation.
+	 */
+	if (i > 0) {
+		pr_err("\n");
+		pr_err("≡≡≡ UNSUPPORTED KERNEL VARIANT ≡≡≡\n");
+		pr_err("This kernel uses \"%s\" instead of\n", fallback_names[i - 1]);
+		pr_err("\"kvm_mmu_get_child_sp\". The function signatures differ\n");
+		pr_err("(6 parameters vs 5), so this hotfix module cannot safely\n");
+		pr_err("replace it. Loading the module would cause a kernel crash.\n");
+		pr_err("\n");
+		pr_err("Options:\n");
+		pr_err("  1. nested=0  — disable nested virt, eliminates attack surface\n");
+		pr_err("     echo \"options %s nested=0\" > /etc/modprobe.d/disable-nested.conf\n",
+			kl("kvm_intel_init") ? "kvm_intel" : "kvm_amd");
+		pr_err("  2. Kernel upgrade — switch to a kernel where upstream\n");
+		pr_err("     commit 81ccda30b4e8 is backported\n");
+		pr_err("≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡\n");
+		return -ENOTSUPP;
+	}
 
 	return 0;
 }
