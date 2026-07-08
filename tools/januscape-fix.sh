@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta70"
+VERSION="v26.7.8-beta76"
 
 set -e
 
@@ -270,6 +270,23 @@ EOF
 
             log "开始 kpatch-build (预计 10-20 分钟)..."
             kpatch-build --skip-compiler-check fix.patch 2>&1 | tail -10 || true
+
+            # 分析 build.log 给出诊断
+            local BLOG="/root/.kpatch/build.log"
+            if [ -f "$BLOG" ]; then
+                if grep -q 'Hunk.*FAILED' "$BLOG" 2>/dev/null; then
+                    warn "补丁行号不匹配 — 内核子版本 ${KERNEL} 不在本补丁支持范围"
+                    warn "已测试的子版本: 408, 496, 500, 553"
+                    echo "  替代方案: nested=0 或 内核升级 7.1"
+                elif grep -q 'unexpected end of file' "$BLOG" 2>/dev/null; then
+                    warn "补丁文件格式错误 — 请重新下载最新版本"
+                elif grep -q 'kernel.*source\|Downloading kernel' "$BLOG" 2>/dev/null | grep -q 'ERROR\|Failed' 2>/dev/null; then
+                    warn "内核源码下载失败 — Source 仓库不可用"
+                else
+                    warn "编译失败，详情: $BLOG"
+                    grep -i 'error\|failed' "$BLOG" | tail -3
+                fi
+            fi
 
             # 恢复原始 repo 文件
             cp "$REPO_BAK"/*.repo /etc/yum.repos.d/ 2>/dev/null
