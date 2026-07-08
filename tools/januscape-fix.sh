@@ -45,15 +45,76 @@ run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
 run_kpatch_deps(){
     log "kpatch 编译环境准备"
 
-    # 前置检查: kernel-devel
+    # 前置检查: kernel-devel — 没有就尝试安装
     if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
-        err "当前内核 $(uname -r) 的 kernel-devel 包不存在"
-        warn "kpatch 需要与内核精确匹配的开发包"
-        warn "定制内核或已 EOL 的发行版通常不提供。"
+        warn "kernel-devel 未安装，尝试从仓库获取..."
+        # 先试默认仓库
+        if ! dnf install -y kernel-devel-$(uname -r) 2>/dev/null | grep -q '已安装\|Complete'; then
+            # 再试发行版仓库 (main → vault 降级)
+            local DID=""
+            [ -f /etc/os-release ] && DID=$(grep -oP '^ID="?\K[^"]+' /etc/os-release)
+            grep -qi rocky /etc/os-release 2>/dev/null && DID="rocky"
+            grep -qi alma  /etc/os-release 2>/dev/null && DID="alma"
+            local VER=$(grep -oP '^VERSION_ID="?\K[0-9.]+' /etc/os-release 2>/dev/null)
+            local MAJOR="${VER%%.*}"
+
+            # Rocky/Alma 用 pub (活跃版本) → vault (EOL 版本) 降级
+            local PUB_BASE="" VAULT_BASE=""
+            case "$DID" in
+                rocky) PUB_BASE="https://dl.rockylinux.org/pub/rocky/${VER}"
+                       VAULT_BASE="https://dl.rockylinux.org/vault/rocky/${VER}" ;;
+                alma)  PUB_BASE="https://repo.almalinux.org/almalinux/${VER}"
+                       VAULT_BASE="https://repo.almalinux.org/vault/${VER}" ;;
+                *)     VAULT_BASE="https://mirrors.aliyun.com/centos-vault/8-stream" ;;
+            esac
+
+            for BASE in "$PUB_BASE" "$VAULT_BASE"; do
+                [ -z "$BASE" ] && continue
+                warn "尝试 ${DID}: ${BASE}..."
+                cat > /etc/yum.repos.d/el8-temp.repo << EOF
+[el8-temp-baseos]
+name=EL8 Temporary BaseOS
+baseurl=${BASE}/BaseOS/x86_64/os/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF
+                dnf clean metadata 2>/dev/null
+                dnf install -y kernel-devel-$(uname -r) 2>/dev/null | tail -3
+                [ -f "/lib/modules/$(uname -r)/build/Makefile" ] && break
+            done
+
+            # 当前小版本没有 → 降级搜索更老小版本的 vault
+            if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ] && [ -n "$VLT_BASE" ]; then
+                local MINOR="${VER##*.}"
+                while [ "$MINOR" -gt 0 ]; do
+                    MINOR=$((MINOR - 1))
+                    local OLD_BASE="${VLT_BASE%/*.*}/${MAJOR}.${MINOR}"
+                    warn "降级搜索: ${OLD_BASE}..."
+                    cat > /etc/yum.repos.d/el8-temp.repo << EOF
+[el8-temp-baseos]
+name=EL8 Vault ${MAJOR}.${MINOR} BaseOS
+baseurl=${OLD_BASE}/BaseOS/x86_64/os/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF
+                    dnf clean metadata 2>/dev/null
+                    dnf install -y kernel-devel-$(uname -r) 2>/dev/null | tail -3
+                    [ -f "/lib/modules/$(uname -r)/build/Makefile" ] && break
+                done
+            fi
+        fi
+    fi
+
+    if [ ! -f "/lib/modules/$(uname -r)/build/Makefile" ]; then
+        err "kernel-devel 安装失败 — 内核 $(uname -r) 无可用开发包"
+        warn "此内核已从所有仓库移除 (EOL)，kpatch 无法编译。"
         echo ""
         echo "  替代方案:"
         echo "    1. nested=0 关闭嵌套虚拟化 (无需编译)"
         echo "    2. 内核升级 7.1  (源码编译，自带补丁)"
+        rm -f /etc/yum.repos.d/el8-temp-*.repo
         return
     fi
     ok "kernel-devel 可用"
@@ -77,60 +138,52 @@ run_kpatch_deps(){
                    rpm-build 2>/dev/null | tail -3
     ok "编译工具链已就绪"
 
-    local KVR=$(uname -r | sed 's/\.x86_64//')
-    local DEBUGINFO_OK=0
-    local DISTRO_ID=""
+    # 调试符号: 直接搜已知存在路径的包
+    local KVR=$(uname -r | sed 's/\.x86_64//') DEBUGINFO_OK=0
+    log "安装 kernel-debuginfo..."
 
-    # 识别 RHEL 8 系发行版
-    if [ -f /etc/os-release ]; then
-        DISTRO_ID=$(grep -oP '^ID="?\K[^"]+' /etc/os-release)
-    fi
-    if grep -qi rocky /etc/os-release 2>/dev/null; then DISTRO_ID="rocky"; fi
-    if grep -qi alma  /etc/os-release 2>/dev/null; then DISTRO_ID="alma"; fi
-
-    log "安装 kernel-debuginfo (内核 $(uname -r), 发行版: ${DISTRO_ID:-未知})..."
-
-    # 尝试 1: 默认仓库
-    if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
-                     kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
+    # 方法 1: dnf debuginfo-install (标准 RHEL 系做法)
+    if dnf debuginfo-install -y kernel-$(uname -r) 2>/dev/null; then
         DEBUGINFO_OK=1
     fi
 
-    # 尝试 2: 按发行版自动配 vault
+    # 方法 2: 直接搜索 BaseOS 同目录下的 debuginfo RPM
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
-        local VAULT_BASE=""
-        case "$DISTRO_ID" in
-            rocky)
-                local RV=$(grep -oP '^VERSION_ID="?\K[0-9.]+' /etc/os-release)
-                VAULT_BASE="https://dl.rockylinux.org/vault/rocky/${RV}" ;;
-            alma)
-                local AV=$(grep -oP '^VERSION_ID="?\K[0-9.]+' /etc/os-release)
-                VAULT_BASE="https://repo.almalinux.org/vault/${AV}" ;;
-            *)
-                VAULT_BASE="https://mirrors.aliyun.com/centos-vault/8-stream" ;;
-        esac
+        warn "debuginfo-install 失败，直接搜索 BaseOS 仓库内的 debuginfo 包..."
+        local DEVEL_URL=""
+        # 从已安装的 kernel-devel 包反查仓库 URL
+        DEVEL_URL=$(dnf repoquery --location kernel-devel-$(uname -r | sed 's/\.x86_64//') 2>/dev/null | head -1)
+        if [ -n "$DEVEL_URL" ]; then
+            local BASE_URL="${DEVEL_URL%/*}"
+            # debuginfo 与内核包同目录 (Packages/k/)
+            curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-${KVR}.rpm \
+                "${BASE_URL}/k/kernel-debuginfo-${KVR}.x86_64.rpm" 2>/dev/null
+            curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
+                "${BASE_URL}/k/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
+            if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
+                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null && DEBUGINFO_OK=1
+            fi
+        fi
+    fi
 
-        if [ -n "$VAULT_BASE" ]; then
-            warn "默认仓库无 debuginfo，尝试 ${DISTRO_ID:-vault} 仓库..."
-            cat > /etc/yum.repos.d/el8-vault-debuginfo.repo << EOF
-[el8-vault-baseos]
-name=EL8 Vault BaseOS
-baseurl=${VAULT_BASE}/BaseOS/x86_64/os/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
+    # 方法 3: 手动配已知可用的 debuginfo 源
+    if [ "$DEBUGINFO_OK" -eq 0 ]; then
+        warn "直接搜索失败，尝试已知 debuginfo 镜像..."
+        for URL in \
+            "https://debuginfo.centos.org/8/x86_64" \
+            "https://dl.rockylinux.org/pub/rocky/8.10/devel/x86_64/os"; do
+            curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-${KVR}.rpm \
+                "${URL}/Packages/k/kernel-debuginfo-${KVR}.x86_64.rpm" 2>/dev/null
+            curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
+                "${URL}/Packages/k/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm" 2>/dev/null
+            if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
+                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>/dev/null && DEBUGINFO_OK=1
+                break
+            fi
+        done
+    fi
 
-[el8-vault-debuginfo]
-name=EL8 Vault Debuginfo
-baseurl=${VAULT_BASE}/Debuginfo/x86_64/os/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-EOF
-            dnf clean metadata 2>/dev/null
-            if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
-                             kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
-                DEBUGINFO_OK=1
+    rm -f /tmp/kernel-debuginfo-*.rpm
             fi
         fi
     fi
@@ -142,12 +195,11 @@ EOF
         echo "  替代方案:"
         echo "    1. nested=0 关闭嵌套虚拟化 (无需编译)"
         echo "    2. 内核升级 7.1   (源码编译，自带补丁)"
-        rm -f /etc/yum.repos.d/el8-vault-debuginfo.repo
+        rm -f /etc/yum.repos.d/el8-temp-*.repo
         return
     fi
     ok "debuginfo 安装完成"
-
-    rm -f /etc/yum.repos.d/el8-vault-debuginfo.repo
+    rm -f /etc/yum.repos.d/el8-temp-*.repo
 
     if command -v kpatch &>/dev/null; then
         ok "kpatch 已安装: $(kpatch --version 2>&1 | head -1)"
