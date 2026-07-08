@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta80"
+VERSION="v26.7.8-beta81"
 
 set -e
 
@@ -64,11 +64,42 @@ run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
 run_kpatch_deps(){
     log "kpatch 编译环境准备"
 
-    # 前置: 内核版本预检
-    local KVER=$(uname -r | sed 's/\.el8.*//; s/.*-//')
+    # 前置: 内核版本预检 + 预编译 .ko 匹配
+    local KVER=$(uname -r | grep -oP '4\.18\.0-\K[0-9]+')
+    local KO_FILE="cve202653359-rhel4.18.0-${KVER}.ko"
+    local KO_URL="https://raw.githubusercontent.com/Aoripus-LTD/Januscape-Hotfix/main/installer/${KO_FILE}"
+
     case "$KVER" in
         408|496|500|553)
-            ok "内核 ${KVER} 在 kpatch 支持范围内" ;;
+            ok "内核 ${KVER} 匹配预编译补丁"
+
+            # 尝试直接下载预编译 .ko
+            log "下载预编译补丁 ${KO_FILE}..."
+            curl -#L --connect-timeout 10 -m 120 -o "/tmp/${KO_FILE}" "$KO_URL" 2>&1 || true
+
+            if [ -s "/tmp/${KO_FILE}" ] && file "/tmp/${KO_FILE}" | grep -q 'ELF'; then
+                log "加载预编译补丁..."
+                kpatch load "/tmp/${KO_FILE}" 2>&1 || true
+                if kpatch list 2>/dev/null | grep -q 'enabled'; then
+                    ok "预编译补丁已加载"
+                    rm -f "/tmp/${KO_FILE}"
+                    # 验证
+                    echo ""
+                    local ans
+                    if [ -t 0 ]; then
+                        read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans
+                    else
+                        read -p "  是否运行环境检测验证补丁状态? [Y/n] " ans </dev/tty
+                    fi
+                    [ "$ans" != "n" ] && [ "$ans" != "N" ] && detect_env
+                    return
+                fi
+                warn "kpatch load 失败，切换在线编译模式..."
+            else
+                warn "预编译包下载失败，切换在线编译模式..."
+            fi
+            rm -f "/tmp/${KO_FILE}"
+            ;;
         552)
             err "内核 552 代码结构不兼容 — kpatch 无法编译"
             echo "  552 的 paging_tmpl.h 已重构，patch 上下文不匹配"
@@ -82,9 +113,9 @@ run_kpatch_deps(){
             warn "已验证子版本: 408, 496, 500, 553"
             local ans0
             if [ -t 0 ]; then
-                read -p "  是否继续? [y/N] " ans0
+                read -p "  是否继续在线编译? [y/N] " ans0
             else
-                read -p "  是否继续? [y/N] " ans0 </dev/tty
+                read -p "  是否继续在线编译? [y/N] " ans0 </dev/tty
             fi
             [ "$ans0" != "y" ] && [ "$ans0" != "Y" ] && return ;;
     esac

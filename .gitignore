@@ -1,6 +1,7 @@
 # Build artifacts
 *.o
 *.ko
+!installer/*.ko
 *.mod.c
 *.mod.o
 *.symvers
