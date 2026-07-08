@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta97"
+VERSION="v26.7.8-beta103"
 
 set -e
 
@@ -563,12 +563,13 @@ show_menu() {
     echo "  │ 重编译   │ ⭐2  │ 9/10 │ √          │ √        │ 编译+重启  │ ✓        │ 一次修改永久有效，不依赖补丁   │"
     echo "  │ 升级 7.1 │ ⭐3  │ 9/10 │ √          │ √        │ 30分钟+重启│ ✓        │ 主线上游已含；魔方云修软链接   │"
     echo "  └──────────┴──────┴──────┴────────────┴──────────┴────────────┴──────────┴────────────────────────────────┘"
-    # 绿色高亮 livepatch 推荐行 (内核 >= 4.12)
-    local MAJOR=$(uname -r | cut -d. -f1)
-    local MINOR=$(uname -r | cut -d. -f2)
-    if [ "$MAJOR" -gt 4 ] || ([ "$MAJOR" -eq 4 ] && [ "$MINOR" -ge 12 ]); then
-        echo -e "  ${GREEN}→ 内核 ≥ 4.12，强烈推荐 livepatch 方案${NC}"
-    fi
+    # 推荐提示
+    local KVER=$(uname -r | grep -oP '4\.18\.0-\K[0-9]+')
+    case "$KVER" in 408|496|500|553)
+        echo -e "  ${GREEN}→ 该内核有预编译 kpatch，推荐选项 5 一键加载${NC}" ;;
+    *)
+        echo -e "  ${GREEN}→ 强烈推荐 livepatch（零停机、双 fix）${NC}" ;;
+    esac
     echo ""
     echo -e "  ${BOLD}操作${NC}"
     echo "  1) 集群审计                2) 崩溃日志取证"
@@ -625,6 +626,22 @@ show_menu() {
             ;;
         4)
             log "下载并编译 livepatch 热修复模块..."
+            # 确保 kernel-devel 可用
+            if [ ! -f "/lib/modules/$KERNEL/build/Makefile" ]; then
+                warn "kernel-devel 未安装，尝试从系统源安装..."
+                dnf install -y kernel-devel-$KERNEL 2>/dev/null | tail -3 || \
+                yum install -y kernel-devel-$KERNEL 2>/dev/null | tail -3 || \
+                apt install -y linux-headers-$KERNEL 2>/dev/null | tail -3 || true
+                if [ ! -f "/lib/modules/$KERNEL/build/Makefile" ]; then
+                    err "系统源无此内核的 kernel-devel (内核太老/定制版)"
+                    echo "  请手动安装后重新运行脚本:"
+                    echo "  RHEL/CentOS: yum install kernel-devel-$KERNEL"
+                    echo "  Debian/Ubuntu: apt install linux-headers-$KERNEL"
+                    echo "  或: 升级内核 / 换内核后重试"
+                    return
+                fi
+                ok "kernel-devel 已安装"
+            fi
             TMPD=$(mktemp -d)
             try_fetch kmod/hotfix.c    > "$TMPD/hotfix.c"    || { err "下载失败"; return; }
             try_fetch kmod/offsets_db.h > "$TMPD/offsets_db.h" || { err "下载失败"; return; }
