@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta62"
+VERSION="v26.7.8-beta64"
 
 set -e
 
@@ -174,25 +174,42 @@ EOF
         [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
     fi
 
-    # 方法 2: 官方 debuginfo 仓库直下 (跳过不会有的 BaseOS 目录)
+    # 方法 2: 配置 CentOS debuginfo 仓库后用 dnf 装
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
-        warn "debuginfo-install 失败，从官方仓库直接下载..."
-        local KVR=$(uname -r | sed 's/\.x86_64//')
-        for URL in \
-            "http://debuginfo.centos.org/8-stream/x86_64" \
-            "https://cdn.akaere.online/debuginfo.centos.org/8-stream/x86_64" \
-            "https://dl.rockylinux.org/pub/rocky/8.10/devel/x86_64/os"; do
-            log "下载 ${URL##*/}..."
-            curl -#L --connect-timeout 10 -m 600 -o /tmp/kernel-debuginfo-${KVR}.rpm \
-                "${URL}/Packages/kernel-debuginfo-${KVR}.x86_64.rpm"
-            curl -#L --connect-timeout 10 -m 600 -o /tmp/kernel-debuginfo-common-${KVR}.rpm \
-                "${URL}/Packages/kernel-debuginfo-common-x86_64-${KVR}.x86_64.rpm"
-            if [ -s /tmp/kernel-debuginfo-${KVR}.rpm ] && [ -s /tmp/kernel-debuginfo-common-${KVR}.rpm ]; then
-                rpm -ivh /tmp/kernel-debuginfo-${KVR}.rpm /tmp/kernel-debuginfo-common-${KVR}.rpm 2>&1 | tail -5 || true
-                [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1 && break
-            fi
-        done
-        rm -f /tmp/kernel-debuginfo-*.rpm
+        warn "debuginfo-install 失败，配置 CentOS debuginfo 仓库重试..."
+        cat > /etc/yum.repos.d/centos-debuginfo.repo << 'EOF'
+[centos-debuginfo]
+name=CentOS 8 Stream Debuginfo
+baseurl=http://debuginfo.centos.org/8-stream/x86_64/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF
+        dnf clean metadata 2>/dev/null
+        if dnf install -y kernel-debuginfo-$(uname -r | sed 's/\.x86_64//').x86_64 \
+                         kernel-debuginfo-common-x86_64-$(uname -r | sed 's/\.x86_64//').x86_64 2>&1 | tail -5; then
+            [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
+        fi
+        rm -f /etc/yum.repos.d/centos-debuginfo.repo
+    fi
+
+    # 方法 3: Rocky devel 仓库
+    if [ "$DEBUGINFO_OK" -eq 0 ]; then
+        warn "尝试 Rocky devel 仓库..."
+        cat > /etc/yum.repos.d/rocky-devel.repo << 'EOF'
+[rocky-devel]
+name=Rocky 8 Devel
+baseurl=https://dl.rockylinux.org/pub/rocky/8.10/devel/x86_64/os/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF
+        dnf clean metadata 2>/dev/null
+        if dnf install -y kernel-debuginfo-$(uname -r | sed 's/\.x86_64//').x86_64 \
+                         kernel-debuginfo-common-x86_64-$(uname -r | sed 's/\.x86_64//').x86_64 2>&1 | tail -5; then
+            [ -f "/usr/lib/debug/lib/modules/$(uname -r)/vmlinux" ] && DEBUGINFO_OK=1
+        fi
+        rm -f /etc/yum.repos.d/rocky-devel.repo
     fi
 
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
@@ -510,6 +527,8 @@ show_menu() {
         *) warn "无效选择" ;;
     esac
     echo ""
+    # 清理子任务可能残留的 stdin 数据
+    while read -t 0.1 -r _ 2>/dev/null; do :; done
     if [ -t 0 ]; then
         read -p "  按 Enter 返回主菜单 (输入 0 退出)..." PAUSE
     else
