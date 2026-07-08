@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta55"
+VERSION="v26.7.8-beta56"
 
 set -e
 
@@ -198,7 +198,7 @@ EOF
     if [ "$DEBUGINFO_OK" -eq 0 ]; then
         warn "直接搜索失败，尝试已知 debuginfo 镜像..."
         for URL in \
-            "https://debuginfo.centos.org/8/x86_64" \
+            "http://debuginfo.centos.org/8-stream/x86_64" \
             "https://dl.rockylinux.org/pub/rocky/8.10/devel/x86_64/os"; do
             curl -sL --connect-timeout 5 -m 30 -o /tmp/kernel-debuginfo-${KVR}.rpm \
                 "${URL}/Packages/k/kernel-debuginfo-${KVR}.x86_64.rpm" 2>/dev/null
