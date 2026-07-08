@@ -4,7 +4,7 @@
 # 完整文档: https://github.com/Aoripus-LTD/Januscape-Hotfix
 # 各方案独立文档: docs/
 
-VERSION="v26.7.8-beta76"
+VERSION="v26.7.8-beta77"
 
 set -e
 
@@ -262,6 +262,18 @@ EOF
         curl -sL --connect-timeout 5 -m 30 -o "$PATCHDIR/fix.patch" "$PATCH_URL" 2>/dev/null
         if [ -f "$PATCHDIR/fix.patch" ] && grep -q 'kvm_mmu_page' "$PATCHDIR/fix.patch" 2>/dev/null; then
             cd "$PATCHDIR"
+            # 自适应行号修正: 扫描内核源码找到 hunk 上下文起始行
+            local SRC_FILE=$(find /root/.kpatch/src/ -name paging_tmpl.h 2>/dev/null | head -1)
+            local NEW_LINE=""
+            if [ -f "$SRC_FILE" ]; then
+                NEW_LINE=$(grep -n 'shadow_walk_okay.*shadow_walk_next' "$SRC_FILE" | head -1 | cut -d: -f1)
+                if [ -n "$NEW_LINE" ] && [ "$NEW_LINE" != "672" ]; then
+                    local OLD_LINE=672
+                    sed -i "s/@@ -${OLD_LINE},14 +${OLD_LINE},/@@ -${NEW_LINE},14 +${NEW_LINE},/" fix.patch
+                    log "自适应行号: ${OLD_LINE} → ${NEW_LINE}"
+                fi
+            fi
+
             # 备份并全局替换 repo 中已失效的 vault.centos.org → Rocky vault
             local REPO_BAK=$(mktemp -d)
             cp /etc/yum.repos.d/*.repo "$REPO_BAK/" 2>/dev/null
