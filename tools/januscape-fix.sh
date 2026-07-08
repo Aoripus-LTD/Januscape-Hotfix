@@ -42,7 +42,66 @@ try_fetch() {
 
 run_audit()      { try_fetch tools/januscape-check.sh   | bash; }
 run_logcheck()   { try_fetch tools/januscape-logcheck.sh | bash; }
-run_kpatch_deps(){ log "运行 kpatch 编译环境准备 (仅检查 & 安装依赖)"; try_fetch tools/kpatch-deps.sh | bash; }
+run_kpatch_deps(){
+    log "kpatch 编译环境准备"
+    echo "  将安装: gcc make ccache elfutils pesign openssl 等编译依赖"
+    echo "  以及内核调试符号包 (kernel-debuginfo)"
+    echo ""
+    local ans
+    if [ -t 0 ]; then
+        read -p "  开始安装? [y/N] " ans
+    else
+        read -p "  开始安装? [y/N] " ans </dev/tty
+    fi
+    if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then
+        warn "已取消"; return
+    fi
+
+    # 先装基础依赖
+    log "安装编译工具链..."
+    dnf install -y gcc make ccache git wget elfutils elfutils-devel \
+                   elfutils-libelf-devel pesign yum-utils openssl-devel \
+                   rpm-build kernel-devel-$(uname -r) 2>&1 | tail -3
+
+    # 调试符号包分发行版处理
+    local KVR=$(uname -r | sed 's/\.x86_64//')
+    log "安装 kernel-debuginfo..."
+    if dnf install -y kernel-debuginfo-${KVR}.x86_64 \
+                     kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>/dev/null; then
+        ok "debuginfo 安装完成"
+    else
+        warn "默认仓库无 debuginfo，尝试配置 CentOS Stream 8..."
+        cat > /etc/yum.repos.d/centos-stream-8-debuginfo.repo << 'EOF'
+[centos-stream-8-debuginfo]
+name=CentOS Stream 8 Debuginfo
+baseurl=http://vault.centos.org/centos/8-stream/Debuginfo/x86_64/os/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF
+        dnf clean metadata 2>/dev/null
+        dnf install -y kernel-debuginfo-${KVR}.x86_64 \
+                       kernel-debuginfo-common-x86_64-${KVR}.x86_64 2>&1 | tail -5 \
+            || warn "debuginfo 仍安装失败，请手动安装后重试"
+    fi
+
+    # 编译 kpatch
+    if command -v kpatch &>/dev/null; then
+        ok "kpatch 已安装: $(kpatch --version 2>&1 | head -1)"
+    else
+        log "编译安装 kpatch..."
+        local TMPD=$(mktemp -d)
+        git clone https://github.com/dynup/kpatch.git "$TMPD/kpatch" 2>&1 | tail -1
+        make -C "$TMPD/kpatch" -j$(nproc) 2>&1 | tail -3
+        make -C "$TMPD/kpatch" install 2>&1 | tail -1
+        rm -rf "$TMPD"
+        ok "kpatch 安装完成"
+    fi
+
+    echo ""
+    log "环境准备完成。下一步: kpatch-build --skip-compiler-check <patch-file>"
+    echo "  详见: docs/kpatch-rhel8.md"
+}
 
 detect_region() {
     local c; c=$(curl -s --connect-timeout 3 -m 5 ipinfo.io 2>/dev/null | grep -oP '"country"\s*:\s*"\K[^"]+')
