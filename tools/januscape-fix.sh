@@ -22,9 +22,20 @@ detect_region() {
     country=$(curl -s --connect-timeout 3 -m 5 ipinfo.io 2>/dev/null | \
               grep -oP '"country"\s*:\s*"\K[^"]+')
 
+    # ipinfo.io 被墙时 fallback
+    if [ -z "$country" ]; then
+        country=$(curl -s --connect-timeout 3 -m 5 https://api.myip.la/cn?json 2>/dev/null | \
+                  grep -oP '"country_code"\s*:\s*"\K[^"]+')
+    fi
+
     if [ "$country" = "CN" ]; then
         echo ""
-        read -p "  检测到中国大陆 IP，是否使用 GitHub 镜像加速? [Y/n] " ANS
+        # 管道执行时 stdin 不是终端，用 /dev/tty 接管交互
+        if [ -t 0 ]; then
+            read -p "  检测到中国大陆 IP，是否使用 GitHub 镜像加速? [Y/n] " ANS
+        else
+            read -p "  检测到中国大陆 IP，是否使用 GitHub 镜像加速? [Y/n] " ANS </dev/tty
+        fi
         if [ "$ANS" != "n" ] && [ "$ANS" != "N" ]; then
             GITHUB_RAW="https://cdn.akaere.online/github.com"
             log "已切换 GitHub 镜像: ${GITHUB_RAW}"
@@ -178,7 +189,11 @@ show_menu() {
     echo ""
     echo "  0) 退出"
     echo ""
-    read -p "  请选择 [0-6]: " CHOICE
+    if [ -t 0 ]; then
+        read -p "  请选择 [0-6]: " CHOICE
+    else
+        read -p "  请选择 [0-6]: " CHOICE </dev/tty
+    fi
 
     case $CHOICE in
         1) run_audit ;;
@@ -244,7 +259,11 @@ main() {
     detect_env
     recommend
 
-    read -p "  进入交互菜单? [Y/n] " ANS
+    if [ -t 0 ]; then
+        read -p "  进入交互菜单? [Y/n] " ANS
+    else
+        read -p "  进入交互菜单? [Y/n] " ANS </dev/tty
+    fi
     if [ "$ANS" != "n" ] && [ "$ANS" != "N" ]; then
         show_menu
     fi
